@@ -1,36 +1,36 @@
 #
 # pretty much always want debugging symbols included
-CFLAGS+=-g
+CXXFLAGS+=-g
 # yell out all warnings and whatnot
-CFLAGS+=-Wall -Wextra -Wunused
+CXXFLAGS+=-Wall -Wextra -Wunused
 # make all warnings into errors
-#CFLAGS+=-Werror
+#CXXFLAGS+=-Werror
 # optimize!
-#CFLAGS+=-O3
+#CXXFLAGS+=-O3
 # or not!
-CFLAGS+=-O0
+CXXFLAGS+=-O0
 #
 # das linker flags
 # LDFLAGS+=
 #
-CC:=gcc
+CXX:=g++
 #
 .SUFFIXES:
-.SUFFIXES: .c .o
+.SUFFIXES: .cpp .o
 #
 SHELL=/bin/sh
 #
 VERSION="$(shell cat VERSION)"
-CFLAGS+=-DVERSION='$(VERSION)'
+CXXFLAGS+=-DVERSION='$(VERSION)'
 #
-CPRG=xboxfs
+CXXPRG=xboxfs
 #
 .PHONY: all clean
 
-all: $(CPRG)
+all: $(CXXPRG)
 
-% : %.c
-	$(CC) $(CFLAGS) $(LDFLAGS) -DPROGNAME='"$@"' -o $@ $<
+% : %.cpp
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -DPROGNAME='"$@"' -o $@ $<
 
 clean:
-	-rm -f $(CPRG)
+	-rm -f $(CXXPRG)

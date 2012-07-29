@@ -1,0 +1,240 @@
+Creating structure definitions
+
+There are two different ways of creating structure definitions. The first is
+writing the definition in XML the other is using JavaScript. The JavaScript
+approach allows you to create more complex structures with features like
+validating the structure. Using XML gives you less features but if a static
+structure is all you need this may be the easiest approach. If you need
+a dynamic structure i.e. where array lengths depend on other values in the
+structure or the structure layout is different when some member value changes,
+then you will have to write the structure definition in JavaScript. There is one
+exception to that rule: if you have an array where the length is supposed to be
+exactly the same as another value in the structure, then you can use XML. But if
+it is something like (length-1) it has to be JavaScript.
+
+Structure definition XML file format
+
+The .osd XML file has one root element: <data> with no attributes. Inside this
+element there must be one of the following elements:
+
+Every element also accepts an attribute name which is then visible in the structures view.
+
+<primitive>
+
+To create a primitive data types like e.g. int and float. This element accepts
+no subelements and can have the following attributes:
+
+    type - The type of this primitive type, one of the following:
+        char - 8 bit ASCII character
+        int8, int16, int32, int64 - signed integer
+        uint8, uint16, uint32, uint64 - unsigned integer
+        bool8, bool16, bool32, bool64 - unsigned boolean (0=false,!0=true)
+        float - 32 bit IEEE754 floating point number
+        double - 64 bit IEEE754 floating point number
+
+<bitfield>
+
+To create a bitfield. This element accepts no subelements and can have the
+following attributes:
+
+    width - The number of bits used by this bitfield. Must be between 1 and 64.
+    type - The type of this bitfield, one of the following:
+        unsigned - bitfield interpreted as unsigned value (0 to 2^width-1)
+        signed - bitfield interpreted as signed value (-2^width-1 to 2^width-1-1)
+        bool - bitfield interpreted as boolean value (0=false,!0=true)
+    Note: Always remember to add padding after a <bitfield>, since otherwise the
+    next element (except for strings and arrays, since they add padding
+    automatically) will start in the middle of a byte. Obviously padding is not
+    necessary if you want this behavior.
+
+<enum>
+
+To create a primitive type, but where the values are displayed as members of an
+enumeration if possible. This element accepts no subelements (however you will
+need an <enumDef> tag in the file to reference it). It has the following
+attributes:
+
+    enum - The underlying enum for this value. Must match the name attribute of
+            one of the <enumDef> tags in this file.
+    type - The type of this enum. See type attribute of <primitive>. Only
+            difference is that Double and Float make no sense.
+    <flags> - This is the same as <enum> with the only difference being that
+            values are represented as a bitwise-or of all the values of the
+            enumeration.
+    <struct> - To create a structure. All other elements (including <struct>)
+            can be a child of this and will then be part of the resulting structure
+    <union> - To create a union. Basically the same as <struct> except for the
+            fact that all child elements will start from the same offset. Useful
+            for interpreting the same sequence of bytes in various ways.
+    <array> - To create an array. This element accepts exactly one child (the
+            underlying type of the array), which can be any of the elements,
+            even <array> itself. It also has the following attributes:
+                length - The number of elements in this array as a decimal
+                number. Alternatively it can also be a string which matches the
+                name attribute of a previously defined <primitive>, <enum> or
+                <flags> element. Then the length will be the value of that
+                element. Currently it is limited to 10000, because larger arrays
+                would use too much memory and slow down the tool too much.
+    <string> - To create a string in various encodings. By default you get
+            a NULL- terminated C-style string. However different types of string
+            can be created with the following attributes:
+                terminatedBy - This attribute determines what unicode codepoint
+                    the string is terminated by. It must be a hexadecimal number
+                    (optionally with leading 0x). When encoding is ASCII, only
+                    values up to 0x7f are meaningful. If neither this nor
+                    maxCharCount nor maxByteCount are set, this is assumed to be
+                    set to 0 (C-style string)
+                maxCharCount - The maximum number of chars this string can have.
+                    If terminatedBy is set too then whatever is reached first
+                    terminates the string. This is mutually exclusive with
+                    maxByteCount
+                maxByteCount - The maximum number of bytes this string can be
+                    long. If terminatedBy is set too then whatever is reached
+                    first terminates the string. This is mutually exclusive with
+                    maxCharCount. With encodings like ASCII this is the same as
+                    maxCharCount.
+                type - The encoding of this string. Can be one of the following:
+                    ASCII, LATIN-1, UTF-8, UTF-16-LE, UTF-16-BE, UTF-32-LE, or UTF-32-BE.
+                    If neither -LE or -BE suffix is given, little endian is assumed.
+
+An example structure definition in both XML and JavaScript
+
+The common step shared by both approaches is the metadata (.desktop) file:
+
+    [Desktop Entry]
+    Encoding=UTF-8
+    Icon=arrow-up1
+    Type=Service
+    ServiceTypes=KPluginInfo
+
+    Name=Simple test structure
+    Comment=A very simple test structure containing only two items
+
+    X-KDE-PluginInfo-Author=Alex Richardson
+    X-KDE-PluginInfo-Email=foo.bar@email.org
+    X-KDE-PluginInfo-Name=simplestruct
+    X-KDE-PluginInfo-Version=1.0
+    X-KDE-PluginInfo-Website=http://www.plugin.org/
+    X-KDE-PluginInfo-Category=structure
+    X-KDE-PluginInfo-License=LGPL
+    X-KDE-PluginInfo-EnabledByDefault=false
+
+The icon displayed in Okteta for this structure can be anything found by
+executing kdialog --geticon or a path to an icon
+
+These fields should all be pretty much self-explanatory, except for
+X-KDE-PluginInfo-Name. The value of this field must match the name of the
+directory containing the file as well as the name of the .desktop file. When
+creating XML structure definitions the name of the .osd file must also match the
+name.
+
+In this example we would have a directory named simplestruct containing the file
+simplestruct.desktop. When defining structures in XML the directory would also
+contain a file named simplestruct.osd. Using JavaScript we would have a file
+named main.js instead.
+
+A simple XML structure definition
+
+To start we create a definition for a very simple test structure containing only
+integral data types (one char, one 32-bit signed integer, and a bitfield). This
+would be expressed in C/C++ as:
+
+    struct simple {
+        char aChar;
+        int anInt;
+        bool bitFlag :1;
+        unsigned padding :7;
+    };
+
+The first step is writing the .osd file according to the file format defined in
+the previous section. We will call simplestruct.osd:
+
+    <?xml version="1.0" encoding="UTF-8"?>
+    <data>
+        <struct name="simple">
+            <primitive name="aChar" type="Char"/>
+            <primitive name="anInt" type="Int32"/>
+            <bitfield name="bitFlag" type="bool" width="1"/>
+            <bitfield name="padding" type="unsigned" width="7"/>
+        </struct>
+    </data>
+
+which is fairly similar to the C/C++ definition.
+
+Now create a directory simplestruct inside the structure installation directory
+(see manually installing structure definitions) and copy the two files to this
+directory. Now you can restart Okteta and use the new structure.
+
+The simple structure in JavaScript
+
+To implement the structure above in JavaScript, create a file named main.js
+instead of simplestruct.osd. The contents of that file should be:
+
+    function init() {
+        var structure = struct({
+            aChar : char(),
+            anInt : int32(),
+            bitFlag : bitfield("bool", 1),
+            padding : bitfield("unsigned", 7),
+        })
+        return structure;
+    }
+
+The structure displayed by Okteta is always the return value of the init function.
+
+The following functions can be called to create a primitive type:
+        char()
+        int8(), int16(), int32() or int64()
+        uint8(), uint16(), uint32() or uint64()
+        bool8(), bool16(), bool32() or bool64()
+        float()
+        double()
+
+The bitfield function takes two parameters, the first being a string consisting
+of bool, signed or unsigned. The second parameter is an integer which sets the
+width in bits.
+
+More complex structures
+
+Next we create a definition of a more complex structure which we will call
+"complex" and save in a file named complex.osd. This structure will contain two
+arrays (one with fixed length and one where the length is determined at runtime)
+as well as a nested structure and a union.
+
+    <?xml version="1.0" encoding="UTF-8"?>
+    <data>
+        <struct name="complex">
+            <primitive name="size" type="UInt8" />
+            <union name="aUnion">
+                <array name="fourBytes" length="4">
+                    <primitive type="Int8" />
+                </array>
+            </union>
+            <struct name="nested">
+                <!-- references the field size above -->
+                <array name="string" length="size">
+                    <primitive type="Char" />
+                </array>
+            </struct>
+        </struct>
+    </data>
+
+This would correspond to the following in pseudo-C/C++
+
+    struct complex {
+        uint8_t size;
+        union aUnion {
+            int8_t fourBytes[4];
+        };
+        struct nested {
+        //not valid C++, references value of the uint8 size
+            char string[size];
+        };
+    };
+
+Note: You can obviously only have dynamic length arrays reference fields before
+the array.
+
+Next we create the complex.desktop file just as in the example before (make sure
+you set X-KDE-PluginInfo-Name correctly) and also do the same to install both
+files.

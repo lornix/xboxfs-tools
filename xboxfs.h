@@ -34,10 +34,12 @@ class XBoxFATX {
  public: // methods
      std::string datafilename(int which);
      void showinfo();
-     unsigned char* readfile(std::string filename);
+     unsigned char* readfilecontents(std::string filename);
+     unsigned int getfilesize(std::string filename);
      void usage();
      void readDirectoryTree(unsigned int startCluster);
      void readClusters(unsigned int startCluster,unsigned char** dirbuf,unsigned int* buflen);
+     void convertUTF16(char* outstr,wchar_t* instr,unsigned int len);
  public: // -structors
      XBoxFATX(char* path);
      ~XBoxFATX();
@@ -56,6 +58,8 @@ class XBoxFATX {
      int rootDirCluster;        // usually 1
      int partitionID;           // from device
      int lastfile;              // derived from device
+     int countFiles;            // derived
+     int countDirs;             // derived
      long int bytesPerDevice;   // huge! (256M/512M/768M...)
      std::string deviceName;    // from device
      std::string databasename;  // "Data"

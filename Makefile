@@ -23,14 +23,15 @@ SHELL=/bin/sh
 VERSION="$(shell cat VERSION)"
 CXXFLAGS+=-DVERSION='$(VERSION)'
 #
-CXXPRG=xboxfs
-#
 .PHONY: all clean
 
-all: $(CXXPRG)
+all: xboxfs
 
-% : %.cpp
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -DPROGNAME='"$@"' -o $@ $<
+xboxfs: xboxfs.o xboxfs-code.o
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -DPROGNAME='"$@"' -o $@ $^
+
+%.o : %.cpp xboxfs.h
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -DPROGNAME='"$@"' -o $@ -c $<
 
 clean:
-	-rm -f $(CXXPRG)
+	-rm -f xboxfs *.o

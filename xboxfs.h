@@ -5,16 +5,20 @@
 #include <cstdlib>
 #include <cassert>
 #include <clocale>
+#include <unistd.h>
 #include <endian.h>
 #include <string.h>
 
+// clustermap code values
 #define CLUSTEREND 0xFFFFFFFF
 #define CLUSTERID  0xFFFFFFF8
+// max length of directory name entry
+#define DIRNAMELEN (0x2a)
 
 struct direntries {
     int namelen;
     int attributes;
-    char name[0x2a];
+    std::string name; // max of 0x2a (42) characters
     unsigned int startCluster;
     unsigned int filesize;
     unsigned short int createDate;
@@ -23,15 +27,17 @@ struct direntries {
     unsigned short int lwriteTime;
     unsigned short int accessDate;
     unsigned short int accessTime;
+    int nestlevel;
 };
 
 class XBoxFATX {
  public: // methods
      std::string datafilename(int which);
      void showinfo();
-     char* readfile(std::string filename);
+     unsigned char* readfile(std::string filename);
      void usage();
      void readDirectoryTree(unsigned int startCluster);
+     void readClusters(unsigned int startCluster,unsigned char** dirbuf,unsigned int* buflen);
  public: // -structors
      XBoxFATX(char* path);
      ~XBoxFATX();

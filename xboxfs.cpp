@@ -60,11 +60,12 @@ XBoxFATX::XBoxFATX(char* path)
             // Read the entire directory contents into memory
             readDirectoryTree(rootDirCluster);
             // lookup 'name.txt' to find volume name
-            // char* nametxt=readfile("name.txt");
-            // if (!nametxt) {
-            //     fprintf(stderr,"Unable to find volume name (name.txt)\n");
-            //     exit(1);
-            // }
+            unsigned char* nametxt=readfile("name.txt");
+            if (!nametxt) {
+                fprintf(stderr,"Unable to find volume name (name.txt)\n");
+                exit(1);
+            }
+            fprintf(stderr,">%s<\n\n",nametxt);
         }
         // we're not concerned with other files at the moment,
         // just that they exist
@@ -73,35 +74,41 @@ XBoxFATX::XBoxFATX(char* path)
         fnum++;
     }
 }
-void XBoxFATX::readDirectoryTree(unsigned int startCluster)
+void XBoxFATX::readClusters(unsigned int startCluster,unsigned char** buffer,unsigned int* bufferlen)
 {
-    // this'll be recursive, reading each cluster, scanning for entries
-    // and calling itself when it finds a directory entry
-    static int dirlevel=0;
     unsigned int currentCluster=startCluster;
+    unsigned int numclusters=0;
     unsigned int buflen=0;
-    int numclusters=0;
-    unsigned char* dirbuf=NULL;
+    unsigned char* clusterbuf=NULL;
     //
-    while (1) {
+    while (currentCluster!=CLUSTEREND) {
         unsigned int clusterPos=(currentCluster-1)*bytesPerCluster;
         numclusters++;
         // make buffer the right size
         buflen=(bytesPerCluster*numclusters);
-        dirbuf=(unsigned char*)realloc(dirbuf,buflen);
-        if (!dirbuf) {
-            perror("ReadDirectoryTree - Malloc");
+        clusterbuf=(unsigned char*)realloc(clusterbuf,buflen);
+        if (!clusterbuf) {
+            perror("readClusters - Malloc");
             exit(1);
         }
         // read new cluster
-        long int offset=(long int)dirbuf+((numclusters-1)*bytesPerCluster);
+        long int offset=(long int)clusterbuf+((numclusters-1)*bytesPerCluster);
         readdata(2,clusterPos,bytesPerCluster,(void*)offset);
-        if (clustermap[currentCluster]==CLUSTEREND) {
-            break;
-        }
         // move to next cluster
         currentCluster=clustermap[currentCluster];
     }
+    *buffer=clusterbuf;
+    *bufferlen=buflen;
+}
+void XBoxFATX::readDirectoryTree(unsigned int startCluster)
+{
+    // this'll be recursive, reading each cluster, scanning for entries
+    // and calling itself when it finds a directory entry
+    int nestlevel=0;
+    unsigned int buflen=0;
+    unsigned char* dirbuf=NULL;
+    readClusters(startCluster,&dirbuf,&buflen);
+    //
     unsigned char* ptr=dirbuf;
     while (ptr<(dirbuf+buflen)) {
         switch (*ptr) {
@@ -109,65 +116,75 @@ void XBoxFATX::readDirectoryTree(unsigned int startCluster)
                 break;
             case 0xFF: // unused entry
                 break;
+            case 0x00: // shouldn't happen, discard if it does
+                break;
             default: // active entry
+                char namebuf[DIRNAMELEN+1];
                 struct direntries entry;
                 entry.namelen=*ptr;
                 entry.attributes=*(ptr+1);
-                memcpy(entry.name,ptr+0x02,entry.namelen);
-                entry.name[entry.namelen]=0;
+                strncpy(namebuf,(char*)(ptr+0x02),DIRNAMELEN);
+                namebuf[entry.namelen]=0;
+                entry.name=std::string(namebuf);
                 entry.startCluster=be32toh(*((unsigned int*)(ptr+0x2c)));
-                entry.filesize=be32toh(*((unsigned int*)(ptr+0x30)));
-                entry.createDate=be16toh(*((unsigned short int*)(ptr+0x34)));
-                entry.createTime=be16toh(*((unsigned short int*)(ptr+0x36)));
-                entry.lwriteDate=be16toh(*((unsigned short int*)(ptr+0x38)));
-                entry.lwriteTime=be16toh(*((unsigned short int*)(ptr+0x3a)));
-                entry.accessDate=be16toh(*((unsigned short int*)(ptr+0x3c)));
-                entry.accessTime=be16toh(*((unsigned short int*)(ptr+0x3e)));
+                entry.filesize    =be32toh(*((unsigned int*)(ptr+0x30)));
+                entry.createDate  =be16toh(*((unsigned short int*)(ptr+0x34)));
+                entry.createTime  =be16toh(*((unsigned short int*)(ptr+0x36)));
+                entry.lwriteDate  =be16toh(*((unsigned short int*)(ptr+0x38)));
+                entry.lwriteTime  =be16toh(*((unsigned short int*)(ptr+0x3a)));
+                entry.accessDate  =be16toh(*((unsigned short int*)(ptr+0x3c)));
+                entry.accessTime  =be16toh(*((unsigned short int*)(ptr+0x3e)));
+                entry.nestlevel=nestlevel;
+                // store it
                 dirtree.push_back(entry);
-                if (entry.attributes&0x10) {
-                    // subdirectory?
-                    fprintf(stderr,"%*s%s/\n",(dirlevel*4),"",entry.name);
-                }
-                else {
-                    fprintf(stderr,"%*s%s\n",(dirlevel*4),"",entry.name);
-                }
+                //
                 if (entry.attributes&0x10) {
                     // the recursive part!  call ourself when we find a subdir
-                    dirlevel++;
+                    nestlevel++;
                     readDirectoryTree(entry.startCluster);
-                    dirlevel--;
+                    nestlevel--;
                 }
                 break;
         }
+        // entries are 64 bytes long
         ptr+=64;
     }
     free(dirbuf);
 }
-char* XBoxFATX::readfile(std::string filename __attribute__ ((unused)) )
+unsigned char* XBoxFATX::readfile(std::string filename)
 {
-    // FIXME: dummy value
-    return (char*)malloc(1);
+    std::vector<struct direntries>::iterator ptr=dirtree.begin();
+    while ((ptr!=dirtree.end())&&(ptr->name!=filename)) {
+        ptr++;
+    }
+    if (ptr==dirtree.end()) {
+        return NULL;
+    }
+    unsigned char* buffer=NULL;
+    unsigned int buflen=0;
+    readClusters(ptr->startCluster,&buffer,&buflen);
+    buflen=ptr->filesize;
+    buffer=(unsigned char*)realloc(buffer,buflen);
+    fprintf(stderr,"Read '%s', Start: %d, bytes: %#x\n",(ptr->name).c_str(),ptr->startCluster,buflen);
+    // swab(buffer,buffer,buflen);
+    return buffer;
 }
 void XBoxFATX::showinfo()
 {
-    fprintf(stderr,"\n");
-    fprintf(stderr,"Partition ID: %08X\n",partitionID);
-    fprintf(stderr," Device Name: '%s'\n",deviceName.c_str());
-    fprintf(stderr,"  Total Size: %'luM\n",bytesPerDevice/(1024*1024));
-    fprintf(stderr,"   Num files: %d (0000-%04d)\n",lastfile+1,lastfile);
-    fprintf(stderr,"Cluster Size: %'uK bytes\n",bytesPerCluster/1024);
-    fprintf(stderr,"  Root Dir @: %'u\n",rootDirCluster);
-    fprintf(stderr,"Num Clusters: %'u\n",totalClusters);
-    fprintf(stderr,"UsedClusters: %'u\n",usedClusters);
-    // fprintf(stderr,"   getlongBE: %16lx\n",getlongBE(NULL,0));
-    // fprintf(stderr,"    getintBE: %8x\n",getintBE(NULL,0));
-    // fprintf(stderr,"  getshortBE: %4x\n",getshortBE(NULL,0));
+    printf("Partition ID: %08X\n",partitionID);
+    printf(" Device Name: '%s'\n",deviceName.c_str());
+    printf("  Total Size: %'luM\n",bytesPerDevice/(1024*1024));
+    printf("   Num files: %d (0000-%04d)\n",lastfile+1,lastfile);
+    printf("Cluster Size: %'uK bytes\n",bytesPerCluster/1024);
+    printf("  Root Dir @: %'u\n",rootDirCluster);
+    printf("Num Clusters: %'u\n",totalClusters);
+    printf("UsedClusters: %'u\n",usedClusters);
 }
 int main(int argc __attribute__ ((unused)),char* argv[])
 {
     // perform setup and initial testing
     XBoxFATX xbox=XBoxFATX(argv[1]);
-    xbox.showinfo();
+    // xbox.showinfo();
 
     return 0;
 }

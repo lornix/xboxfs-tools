@@ -7,6 +7,11 @@ XBoxFATX::~XBoxFATX()
 void XBoxFATX::readdata(int fnum,long int pos,int len,void* buf)
 {
     static int lastfnum=-1;
+    if (pos>=(1024*1024*1024)) {
+        // if position > 1GIG, make sure fnum is right
+        // xbox puts 1Gig per file
+        fnum=(pos/(1024*1024*1024))+2;
+    }
     if (fnum!=lastfnum) {
         // haven't read this file before, set up fp
         // close currently open file
@@ -17,6 +22,7 @@ void XBoxFATX::readdata(int fnum,long int pos,int len,void* buf)
         fp=fopen(fname.c_str(),"rb");
         lastfnum=fnum;
     }
+    // fprintf(stderr,"readdata: %d: (%d) %04lx\n",fnum,len,pos);
     if ((fp)&&(!fseek(fp,pos,SEEK_SET))) {
         fread(buf,len,1,fp);
     }

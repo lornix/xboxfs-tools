@@ -53,8 +53,8 @@ XBoxFATX::XBoxFATX(char* path)
                     usedClusters++;
                 }
             }
-            // remove count for the '0'th entry, not a real cluster
-            usedClusters--;
+            // remove count for the '0'th entry and root dir
+            usedClusters-=2;
         }
         else if (fnum==2) {
             // Read the entire directory contents into memory
@@ -69,23 +69,79 @@ XBoxFATX::XBoxFATX(char* path)
         // we're not concerned with other files at the moment,
         // just that they exist
         fclose(fp);
-        fp=NULL;
         // increment to check next file
         fnum++;
     }
 }
-void XBoxFATX::readDirectoryTree(int startCluster)
+void XBoxFATX::readDirectoryTree(unsigned int startCluster)
 {
     // this'll be recursive, reading each cluster, scanning for entries
     // and calling itself when it finds a directory entry
-    char* dirbuf=(char*)malloc(bytesPerCluster);
-    if (!dirbuf) {
-        perror("ReadDirectoryTree - Malloc");
-        exit(1);
+    static int dirlevel=0;
+    unsigned int currentCluster=startCluster;
+    unsigned int buflen=0;
+    int numclusters=0;
+    unsigned char* dirbuf=NULL;
+    //
+    while (1) {
+        unsigned int clusterPos=(currentCluster-1)*bytesPerCluster;
+        numclusters++;
+        // make buffer the right size
+        buflen=(bytesPerCluster*numclusters);
+        dirbuf=(unsigned char*)realloc(dirbuf,buflen);
+        if (!dirbuf) {
+            perror("ReadDirectoryTree - Malloc");
+            exit(1);
+        }
+        // read new cluster
+        long int offset=(long int)dirbuf+((numclusters-1)*bytesPerCluster);
+        readdata(2,clusterPos,bytesPerCluster,(void*)offset);
+        if (clustermap[currentCluster]==CLUSTEREND) {
+            break;
+        }
+        // move to next cluster
+        currentCluster=clustermap[currentCluster];
     }
-    unsigned int clusterPos=(startCluster-1)*bytesPerCluster;
-    readdata(2,clusterPos,bytesPerCluster,dirbuf);
-
+    unsigned char* ptr=dirbuf;
+    while (ptr<(dirbuf+buflen)) {
+        switch (*ptr) {
+            case 0xE5: // deleted entry
+                break;
+            case 0xFF: // unused entry
+                break;
+            default: // active entry
+                struct direntries entry;
+                entry.namelen=*ptr;
+                entry.attributes=*(ptr+1);
+                memcpy(entry.name,ptr+0x02,entry.namelen);
+                entry.name[entry.namelen]=0;
+                entry.startCluster=be32toh(*((unsigned int*)(ptr+0x2c)));
+                entry.filesize=be32toh(*((unsigned int*)(ptr+0x30)));
+                entry.createDate=be16toh(*((unsigned short int*)(ptr+0x34)));
+                entry.createTime=be16toh(*((unsigned short int*)(ptr+0x36)));
+                entry.lwriteDate=be16toh(*((unsigned short int*)(ptr+0x38)));
+                entry.lwriteTime=be16toh(*((unsigned short int*)(ptr+0x3a)));
+                entry.accessDate=be16toh(*((unsigned short int*)(ptr+0x3c)));
+                entry.accessTime=be16toh(*((unsigned short int*)(ptr+0x3e)));
+                dirtree.push_back(entry);
+                if (entry.attributes&0x10) {
+                    // subdirectory?
+                    fprintf(stderr,"%*s%s/\n",(dirlevel*4),"",entry.name);
+                }
+                else {
+                    fprintf(stderr,"%*s%s\n",(dirlevel*4),"",entry.name);
+                }
+                if (entry.attributes&0x10) {
+                    // the recursive part!  call ourself when we find a subdir
+                    dirlevel++;
+                    readDirectoryTree(entry.startCluster);
+                    dirlevel--;
+                }
+                break;
+        }
+        ptr+=64;
+    }
+    free(dirbuf);
 }
 char* XBoxFATX::readfile(std::string filename __attribute__ ((unused)) )
 {
@@ -94,6 +150,7 @@ char* XBoxFATX::readfile(std::string filename __attribute__ ((unused)) )
 }
 void XBoxFATX::showinfo()
 {
+    fprintf(stderr,"\n");
     fprintf(stderr,"Partition ID: %08X\n",partitionID);
     fprintf(stderr," Device Name: '%s'\n",deviceName.c_str());
     fprintf(stderr,"  Total Size: %'luM\n",bytesPerDevice/(1024*1024));

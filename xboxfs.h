@@ -6,6 +6,10 @@
 #include <cassert>
 #include <clocale>
 #include <endian.h>
+#include <string.h>
+
+#define CLUSTEREND 0xFFFFFFFF
+#define CLUSTERID  0xFFFFFFF8
 
 struct direntries {
     int namelen;
@@ -27,7 +31,7 @@ class XBoxFATX {
      void showinfo();
      char* readfile(std::string filename);
      void usage();
-     void readDirectoryTree(int startCluster);
+     void readDirectoryTree(unsigned int startCluster);
  public: // -structors
      XBoxFATX(char* path);
      ~XBoxFATX();

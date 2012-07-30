@@ -4,37 +4,48 @@ XBoxFATX::~XBoxFATX()
 {
     // placeholder, nothing to (un)do yet
 }
-static void readdata(FILE* fp,long int pos,int len,void* buf)
+void XBoxFATX::readdata(int fnum,long int pos,int len,void* buf)
 {
+    static int lastfnum=-1;
+    if (fnum!=lastfnum) {
+        // haven't read this file before, set up fp
+        // close currently open file
+        if (fp) {
+            fclose(fp);
+        }
+        std::string fname=datafilename(fnum);
+        fp=fopen(fname.c_str(),"rb");
+        lastfnum=fnum;
+    }
     if ((fp)&&(!fseek(fp,pos,SEEK_SET))) {
         fread(buf,len,1,fp);
     }
 }
-unsigned long int XBoxFATX::getlongBE(FILE* fp,long int pos)
+unsigned long int XBoxFATX::getlongBE(int fnum,long int pos)
 {
     // FIXME: dummy value, shouldn't show up
     unsigned long int valueBE=0xfe0fdcbaefbeadde; // 16,045,690,984,232,390,654
     // just to make sure, we need 64 bit length here
     assert(sizeof(unsigned long int)==8);
-    readdata(fp,pos,sizeof(unsigned long int),&valueBE);
+    readdata(fnum,pos,sizeof(unsigned long int),&valueBE);
     return be64toh(valueBE);
 }
-unsigned int XBoxFATX::getintBE(FILE* fp,long int pos)
+unsigned int XBoxFATX::getintBE(int fnum,long int pos)
 {
     // FIXME: dummy value, shouldn't show up
     unsigned int valueBE=0xefbeadde; // 3,735,928,559
     // just to make sure, we need 32 bit length here
     assert(sizeof(unsigned int)==4);
-    readdata(fp,pos,sizeof(unsigned int),&valueBE);
+    readdata(fnum,pos,sizeof(unsigned int),&valueBE);
     return be32toh(valueBE);
 }
-unsigned short int XBoxFATX::getshortBE(FILE* fp,long int pos)
+unsigned short int XBoxFATX::getshortBE(int fnum,long int pos)
 {
     // FIXME: dummy value, shouldn't show up
     unsigned short int valueBE=0xadde; // 57,005
     // just to make sure, we need 16 bit length here
     assert(sizeof(unsigned short int)==2);
-    readdata(fp,pos,sizeof(unsigned short int),&valueBE);
+    readdata(fnum,pos,sizeof(unsigned short int),&valueBE);
     return be16toh(valueBE);
 }
 std::string XBoxFATX::datafilename(int which)

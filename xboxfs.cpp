@@ -23,7 +23,7 @@ XBoxFATX::XBoxFATX(char* path)
     int fnum=0;
     while (fnum<=lastfile) {
         std::string fname=datafilename(fnum);
-        FILE* fp=fopen(fname.c_str(),"rb");
+        fp=fopen(fname.c_str(),"rb");
         // if not found, fail
         if (fp==NULL) {
             perror(fname.c_str());
@@ -31,24 +31,24 @@ XBoxFATX::XBoxFATX(char* path)
         }
         // grab info while files are open
         if (fnum==0) {
-            bytesPerDevice=getlongBE(fp,0x240);
+            bytesPerDevice=getlongBE(fnum,0x240);
+            // determine how many files total (Data0002->DataXXXX)
             lastfile=(bytesPerDevice/(1024*1024*1024))+2;
         }
         else if (fnum==1) {
-            unsigned int magic=getintBE(fp,0x0);
             // make sure it has the magic header (XTAF=FATX)
-            if (magic!=0x58544146) {
+            if (getintBE(fnum,0x0)!=0x58544146) {
                 fprintf(stderr,"Magic 'XTAF' header not found\n");
             }
-            partitionID=getintBE(fp,0x04);
-            sectorsPerCluster=getintBE(fp,0x08);
-            rootDirCluster=getintBE(fp,0x0c);
+            partitionID=getintBE(fnum,0x04);
+            sectorsPerCluster=getintBE(fnum,0x08);
+            rootDirCluster=getintBE(fnum,0x0c);
             bytesPerCluster=sectorsPerCluster*bytesPerSector;
             totalClusters=(bytesPerDevice/bytesPerCluster);
             // read in the cluster map
             usedClusters=0;
             for (int num=0; num<totalClusters; num++) {
-                clustermap.push_back(getintBE(fp,(num*(sizeof(unsigned int)))+0x1000));
+                clustermap.push_back(getintBE(fnum,num*(sizeof(unsigned int))+0x1000));
                 if (clustermap[num]!=0) {
                     usedClusters++;
                 }
@@ -57,21 +57,37 @@ XBoxFATX::XBoxFATX(char* path)
             usedClusters--;
         }
         else if (fnum==2) {
+            // Read the entire directory contents into memory
+            readDirectoryTree(rootDirCluster);
             // lookup 'name.txt' to find volume name
-            char* nametxt=readfile("name.txt");
-            if (!nametxt) {
-                fprintf(stderr,"Unable to find volume name (name.txt)\n");
-                exit(1);
-            }
+            // char* nametxt=readfile("name.txt");
+            // if (!nametxt) {
+            //     fprintf(stderr,"Unable to find volume name (name.txt)\n");
+            //     exit(1);
+            // }
         }
         // we're not concerned with other files at the moment,
         // just that they exist
         fclose(fp);
+        fp=NULL;
         // increment to check next file
         fnum++;
     }
 }
-char* XBoxFATX::readfile(std::string filename)
+void XBoxFATX::readDirectoryTree(int startCluster)
+{
+    // this'll be recursive, reading each cluster, scanning for entries
+    // and calling itself when it finds a directory entry
+    char* dirbuf=(char*)malloc(bytesPerCluster);
+    if (!dirbuf) {
+        perror("ReadDirectoryTree - Malloc");
+        exit(1);
+    }
+    unsigned int clusterPos=(startCluster-1)*bytesPerCluster;
+    readdata(2,clusterPos,bytesPerCluster,dirbuf);
+
+}
+char* XBoxFATX::readfile(std::string filename __attribute__ ((unused)) )
 {
     // FIXME: dummy value
     return (char*)malloc(1);
@@ -90,7 +106,7 @@ void XBoxFATX::showinfo()
     // fprintf(stderr,"    getintBE: %8x\n",getintBE(NULL,0));
     // fprintf(stderr,"  getshortBE: %4x\n",getshortBE(NULL,0));
 }
-int main(int argc,char* argv[])
+int main(int argc __attribute__ ((unused)),char* argv[])
 {
     // perform setup and initial testing
     XBoxFATX xbox=XBoxFATX(argv[1]);

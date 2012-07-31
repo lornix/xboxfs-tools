@@ -16,10 +16,10 @@ XBoxFATX::XBoxFATX(char* path)
     //
     // check for existence and readability of Data0/1/2...
     lastfile=2;
-    int fnum=0;
+    unsigned int fnum=0;
     while (fnum<=lastfile) {
         // dummy read to pull file (if it exists!) into memory
-        getintBE(fnum,0);
+        getintBE(fnum,0lu);
         // grab info while files are open
         if (fnum==0) {
             // Data0000
@@ -46,8 +46,8 @@ XBoxFATX::XBoxFATX(char* path)
             totalClusters=(bytesPerDevice/bytesPerCluster);
             // read in the cluster map
             usedClusters=0;
-            for (int num=0; num<totalClusters; num++) {
-                int offset=(num*sizeof(unsigned int))+0x1000;
+            for (unsigned int num=0; num<totalClusters; num++) {
+                filepos_t offset=(num*sizeof(unsigned int))+0x1000;
                 int retval=getintBE(fnum,offset);
                 clustermap.push_back(retval);
                 if (clustermap[num]!=0) {
@@ -70,13 +70,16 @@ XBoxFATX::XBoxFATX(char* path)
     wchar_t* nametxt=(wchar_t*)readfilecontents("name.txt");
     // if errors occur, just ignore them, use default deviceName
     if (nametxt) {
-        unsigned int filesize=getfilesize("name.txt");
-        char* cbuf=(char*)malloc((filesize+1)*sizeof(char));
-        if (cbuf) {
-            convertUTF16(cbuf,nametxt,filesize);
-            deviceName=std::string(cbuf);
-            deviceNameSet=true;
-            free(cbuf);
+        filepos_t filesize=getfilesize("name.txt");
+        // if not zero filesize? otherwise don't bother loading it
+        if (filesize) {
+            char* cbuf=(char*)malloc((filesize+1)*sizeof(char));
+            if (cbuf) {
+                convertUTF16(cbuf,nametxt,filesize);
+                deviceName=std::string(cbuf);
+                deviceNameSet=true;
+                free(cbuf);
+            }
         }
         // return buffer to heap
         free(nametxt);
@@ -84,15 +87,15 @@ XBoxFATX::XBoxFATX(char* path)
     // all done! close fp
     closeAllFiles();
 }
-void XBoxFATX::readClusters(unsigned int startCluster,unsigned char** buffer,unsigned int* bufferlen)
+void XBoxFATX::readClusters(unsigned int startCluster,unsigned char** buffer,filepos_t* bufferlen)
 {
     unsigned int currentCluster=startCluster;
     unsigned int numclusters=0;
-    unsigned int buflen=0;
+    filepos_t buflen=0;
     unsigned char* clusterbuf=NULL;
     //
     while (currentCluster!=CLUSTEREND) {
-        unsigned int clusterPos=(currentCluster-1)*bytesPerCluster;
+        filepos_t clusterPos=(currentCluster-1)*bytesPerCluster;
         numclusters++;
         // make buffer the right size
         buflen=(bytesPerCluster*numclusters);
@@ -102,8 +105,8 @@ void XBoxFATX::readClusters(unsigned int startCluster,unsigned char** buffer,uns
             exit(1);
         }
         // read new cluster
-        long int offset=(long int)clusterbuf+((numclusters-1)*bytesPerCluster);
-        readdata(2,clusterPos,bytesPerCluster,(void*)offset);
+        unsigned char* offset=clusterbuf+((numclusters-1)*bytesPerCluster);
+        readdata(2,clusterPos,bytesPerCluster,offset);
         // move to next cluster
         currentCluster=clustermap[currentCluster];
     }
@@ -137,7 +140,7 @@ void XBoxFATX::readDirectoryTree(unsigned int startCluster)
     // this'll be recursive, reading each cluster, scanning for entries
     // and calling itself when it finds a directory entry
     int nestlevel=0;
-    unsigned int buflen=0;
+    filepos_t buflen=0;
     unsigned char* dirbuf=NULL;
     readClusters(startCluster,&dirbuf,&buflen);
     //
@@ -153,10 +156,9 @@ void XBoxFATX::readDirectoryTree(unsigned int startCluster)
             default: // active entry
                 char namebuf[DIRNAMELEN+1];
                 struct direntries entry;
-                entry.namelen=*ptr;
                 entry.attributes=*(ptr+1);
                 strncpy(namebuf,(char*)(ptr+0x02),DIRNAMELEN);
-                namebuf[entry.namelen]=0;
+                namebuf[*ptr]=0;
                 entry.name=std::string(namebuf);
                 entry.startCluster=be32toh(*((unsigned int*)(ptr+0x2c)));
                 entry.filesize    =be32toh(*((unsigned int*)(ptr+0x30)));
@@ -166,36 +168,41 @@ void XBoxFATX::readDirectoryTree(unsigned int startCluster)
                 entry.lwriteTime  =be16toh(*((unsigned short int*)(ptr+0x3a)));
                 entry.accessDate  =be16toh(*((unsigned short int*)(ptr+0x3c)));
                 entry.accessTime  =be16toh(*((unsigned short int*)(ptr+0x3e)));
-                entry.nestlevel=nestlevel;
+                entry.nestlevel   =nestlevel;
+                //
+                if (entry.attributes&0x10) {
+                    // count number of directories found
+                    countDirs++;
+                }
+                else {
+                    // count number of files found
+                    countFiles++;
+                }
                 // store it
                 dirtree.push_back(entry);
                 //
                 if (entry.attributes&0x10) {
-                    countDirs++;
-                }
-                else {
-                    countFiles++;
-                }
-                if (entry.attributes&0x10) {
-                    // the recursive part!  call ourself when we find a subdir
+                    // the recursive part! call ourself when we find a subdir
                     nestlevel++;
                     readDirectoryTree(entry.startCluster);
                     nestlevel--;
                 }
                 break;
+                // end of switch default block
         }
-        // entries are 64 bytes long
+        // skip to next entry (64 bytes each)
         ptr+=64;
     }
     free(dirbuf);
 }
-unsigned int XBoxFATX::getfilesize(std::string filename)
+filepos_t XBoxFATX::getfilesize(std::string filename)
 {
     std::vector<struct direntries>::iterator ptr=dirtree.begin();
     while ((ptr!=dirtree.end())&&(ptr->name!=filename)) {
         ptr++;
     }
     if (ptr==dirtree.end()) {
+        // all entries checked, not found
         return 0;
     }
     return ptr->filesize;
@@ -210,18 +217,23 @@ unsigned char* XBoxFATX::readfilecontents(std::string filename)
         return NULL;
     }
     unsigned char* buffer=NULL;
-    unsigned int buflen=0;
+    filepos_t buflen=0;
+    // read file data, returning malloc'd ram pointer
     readClusters(ptr->startCluster,&buffer,&buflen);
+    // buflen will be multiple of cluster size, so fix it
     buflen=ptr->filesize;
+    // shorten buffer length to reflect file length
     buffer=(unsigned char*)realloc(buffer,buflen);
+    // user must remember to free the ram
     return buffer;
 }
 void XBoxFATX::showinfo()
 {
+    printf("\n");
     printf("  Partition ID: %08X\n",partitionID);
     printf("   Device Name: \"%s\"%s",deviceName.c_str(),deviceNameSet?"\n":" (unnamed unit)\n");
     printf("    Total Size: %'luMeg (%'.2fGig)\n",bytesPerDevice/ONEMEG,(double)bytesPerDevice/ONEGIG);
-    printf("Num Data files: (0000 -> %04d) %d\n",lastfile,lastfile+1);
+    printf("Num Data files: (0000 -> %04d) => %d\n",lastfile,lastfile+1);
     printf(" Used Clusters: %'8u (%.2f%% used)\n",usedClusters,((double)usedClusters*100.0/totalClusters));
     printf("Total Clusters: %'8u\n",totalClusters);
     printf("    File count: %'8d\n",countFiles);
@@ -229,11 +241,46 @@ void XBoxFATX::showinfo()
     // printf("Cluster Size: %'uK bytes\n",bytesPerCluster/ONEKAY);
     // printf("  Root Dir @: %'u\n",rootDirCluster);
 }
+void XBoxFATX::zeroClusters()
+{
+    char* zerobuf=(char*)malloc(bytesPerCluster);
+    if (!zerobuf) {
+        perror("zeroClusters");
+        exit(1);
+    }
+    // fill with zeros
+    memset(zerobuf,0,bytesPerCluster);
+    if (verbose) {
+        printf("Zeroing Clusters:\r");
+    }
+    float prevpercent=0.0;
+    // find all unallocated clusters, write zeros to each cluster
+    for (unsigned int i=0; i<clustermap.size(); i++) {
+        if (clustermap[i]==0) {
+            if (verbose) {
+                float percent=floorf((float)i*1000.0/clustermap.size())/10.0;
+                if (percent>prevpercent) {
+                    printf("Zeroing Clusters: %4.1f%%\r",percent);
+                    prevpercent=percent;
+                }
+            }
+            filepos_t clusterPos=(i-1)*bytesPerCluster;
+            writedata(2,clusterPos,bytesPerCluster,zerobuf);
+        }
+    }
+    if (verbose) {
+        printf("All unused clusters zeroed\n");
+    }
+}
 int main(int argc __attribute__ ((unused)),char* argv[])
 {
     // perform setup and initial testing
     XBoxFATX xbox=XBoxFATX(argv[1]);
     //
+    if ((argc>2)&&(strncmp(argv[2],"--clear",8)==0)) {
+        xbox.verbose=true;
+        xbox.zeroClusters();
+    }
     // determine options used (if any)
     xbox.showinfo();
 

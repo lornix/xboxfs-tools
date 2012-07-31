@@ -2,7 +2,7 @@
 
 XBoxFATX::~XBoxFATX()
 {
-    // all done! close fp
+    // all done! close fpread
     closeAllFiles();
 }
 void XBoxFATX::setDefaults()
@@ -12,13 +12,13 @@ void XBoxFATX::setDefaults()
     deviceName=DEFAULTDEVICENAME;
     deviceNameSet=false;
     // internal values
-    lastfnum=-1;
     fp=NULL;
+    lastfnum=-1;
     //
     // set locale so we get thousands grouping
     setlocale(LC_ALL,"");
 }
-void XBoxFATX::readdata(int fnum,long int pos,int len,void* buf)
+void XBoxFATX::selectfile(int fnum,filepos_t pos)
 {
     if ((fnum>=2)&&(pos>=ONEGIG)) {
         // xbox puts 1Gig per file
@@ -29,24 +29,41 @@ void XBoxFATX::readdata(int fnum,long int pos,int len,void* buf)
         pos=pos%ONEGIG;
     }
     if ((!fp)||(fnum!=lastfnum)) {
-        // haven't read this file before, set up fp
+        // haven't accessed this file before, set up fp
         // close currently open file
         if (fp) {
             fclose(fp);
         }
         std::string fname=datafilename(fnum);
-        fp=fopen(fname.c_str(),"rb");
+        fp=fopen(fname.c_str(),"rb+");
         // if not found, fail
-        if (fp==NULL) {
+        if (!fp) {
             perror(fname.c_str());
             exit(1);
         }
         lastfnum=fnum;
     }
-    // zero out the buffer, prevents data leakage
-    memset(buf,0,len);
-    if ((fp)&&(!fseek(fp,pos,SEEK_SET))) {
-        fread(buf,len,1,fp);
+    if ((fp)&&(fseek(fp,pos,SEEK_SET))) {
+        perror("selectfile-fseek");
+        exit(1);
+    }
+}
+void XBoxFATX::readdata(int fnum,filepos_t pos,filepos_t len,void* buf)
+{
+    selectfile(fnum,pos);
+    if (fread(buf,len,1,fp)!=1) {
+        perror("readdata");
+        exit(1);
+        // if nothing read, zero out the buffer
+        // memset(buf,0,len);
+    }
+}
+void XBoxFATX::writedata(int fnum,filepos_t pos,filepos_t len,void* buf)
+{
+    selectfile(fnum,pos);
+    if (fwrite(buf,len,1,fp)!=1) {
+        perror("writedata");
+        exit(1);
     }
 }
 void XBoxFATX::closeAllFiles()
@@ -58,33 +75,34 @@ void XBoxFATX::closeAllFiles()
     fp=NULL;
     lastfnum=-1;
 }
-unsigned long int XBoxFATX::getlongBE(int fnum,long int pos)
+unsigned long int XBoxFATX::getlongBE(int fnum,filepos_t pos)
 {
-    // FIXME: dummy value, shouldn't show up
+    // dummy value, shouldn't show up
     unsigned long int valueBE=0xee0fdcbaefbeadde; // 0xDEADBEEFBADC0FEE in BE order
     // just to make sure, we need 64 bit length here
-    assert(sizeof(unsigned long int)==8);
-    readdata(fnum,pos,sizeof(unsigned long int),&valueBE);
+    assert(sizeof(valueBE)==8);
+    readdata(fnum,pos,sizeof(valueBE),&valueBE);
     return be64toh(valueBE);
 }
-unsigned int XBoxFATX::getintBE(int fnum,long int pos)
+unsigned int XBoxFATX::getintBE(int fnum,filepos_t pos)
 {
-    // FIXME: dummy value, shouldn't show up
+    // dummy value, shouldn't show up
     unsigned int valueBE=0xefbeadde; // 0xDEADBEEF
     // just to make sure, we need 32 bit length here
-    assert(sizeof(unsigned int)==4);
-    readdata(fnum,pos,sizeof(unsigned int),&valueBE);
+    assert(sizeof(valueBE)==4);
+    readdata(fnum,pos,sizeof(valueBE),&valueBE);
     return be32toh(valueBE);
 }
-unsigned short int XBoxFATX::getshortBE(int fnum,long int pos)
-{
-    // FIXME: dummy value, shouldn't show up
-    unsigned short int valueBE=0xadde; // 0xDEAD
-    // just to make sure, we need 16 bit length here
-    assert(sizeof(unsigned short int)==2);
-    readdata(fnum,pos,sizeof(unsigned short int),&valueBE);
-    return be16toh(valueBE);
-}
+// never used (lornix)
+// unsigned short int XBoxFATX::getshortBE(int fnum,filepos_t pos)
+// {
+//     // dummy value, shouldn't show up
+//     unsigned short int valueBE=0xadde; // 0xDEAD
+//     // just to make sure, we need 16 bit length here
+//     assert(sizeof(valueBE)==2);
+//     readdata(fnum,pos,sizeof(valueBE),&valueBE);
+//     return be16toh(valueBE);
+// }
 std::string XBoxFATX::datafilename(int which)
 {
     std::stringstream fname;
@@ -98,10 +116,15 @@ void XBoxFATX::usage()
 {
     fprintf(stderr,"%s: v%s, Compiled: %s %s\n",PROGNAME,VERSION,__DATE__,__TIME__);
     fprintf(stderr,"\n");
-    fprintf(stderr,"usage: DIR [-l]\n");
+    fprintf(stderr,"usage: DIR [-l|-t|-d]\n");
     fprintf(stderr,"\n");
-    fprintf(stderr,"\tDIR\tDirectory containing XBox360 'Data\?\?\?\?' files (required) (try ./)\n");
-    fprintf(stderr,"\t -l\tList directory tree (default if no options present)\n");
+    fprintf(stderr,"  DIR  Directory containing XBox360 Data files (required)\n");
+    fprintf(stderr,"   -l  * List files\n");
+    fprintf(stderr,"   -t  * List directory tree with files\n");
+    fprintf(stderr,"   -d  * List directory tree without files\n");
+    fprintf(stderr,"   --clear zero unused clusters\n");
+    fprintf(stderr,"\n");
+    fprintf(stderr,"       * possibly not working yet\n");
     fprintf(stderr,"\n");
     exit(1);
 }

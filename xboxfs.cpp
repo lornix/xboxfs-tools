@@ -290,7 +290,7 @@ void XBoxFATX::zeroClusters()
     free(zerobuf);
     closeAllFiles();
     if (verbose) {
-        printf("\r%-30s\n","All Free Space Cleared");
+        printf("\rFree Space Cleared on \"%s\" (%.2f GiB)\n",deviceName.c_str(),((double)bytesPerDevice/(ONEGIG)));
     }
 }
 int main(int argc __attribute__ ((unused)),char* argv[])

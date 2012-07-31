@@ -5,16 +5,8 @@ XBoxFATX::XBoxFATX(char* path)
     if (!path) {
         usage();
     }
-    // useful defaults
-    // Could be assumed, but just in case
-    bytesPerSector=512;
-    // Basename of the data files
-    databasename="Data";
-    // default device name
-    deviceName="Memory Unit";
-    //
-    // set locale so we get thousands grouping
-    setlocale(LC_ALL,"");
+    // set up initial/default values
+    setDefaults();
     //
     // make sure dir path ends with '/'
     dirpath=std::string(path);
@@ -26,27 +18,22 @@ XBoxFATX::XBoxFATX(char* path)
     lastfile=2;
     int fnum=0;
     while (fnum<=lastfile) {
-        std::string fname=datafilename(fnum);
-        fp=fopen(fname.c_str(),"rb");
-        // if not found, fail
-        if (fp==NULL) {
-            perror(fname.c_str());
-            exit(1);
-        }
+        // dummy read to pull file (if it exists!) into memory
+        getintBE(fnum,0);
         // grab info while files are open
         if (fnum==0) {
             // Data0000
             // how big is this device?
-            bytesPerDevice=getlongBE(fnum,0x240);
+            bytesPerDevice=getlongBE(fnum,OFFBYTESPERDEVICE);
             // determine how many Data???? files total (Data0002->DataXXXX)
-            lastfile=(bytesPerDevice/(1024*1024*1024))+2;
+            lastfile=(bytesPerDevice/ONEGIG)+2;
         }
         else if (fnum==1) {
             // Data0001
             // make sure it has the magic header (XTAF=FATX)
             // oddly, it's in LE order, while rest of file is BE
-            if (getintBE(fnum,0x0)!=0x58544146) {
-                fprintf(stderr,"Magic 'XTAF' header not found\n");
+            if (getintBE(fnum,0x0)!=FATXMAGIC_BE) {
+                fprintf(stderr,"XTAF Magic header not found\n");
             }
             // 8 hex digit partition ID
             partitionID=getintBE(fnum,0x04);
@@ -70,34 +57,31 @@ XBoxFATX::XBoxFATX(char* path)
             // decrement for the '0'th entry and root dir's first (only?) cluster
             usedClusters-=2;
         }
-        else if (fnum==2) {
-            // Data0002
-            // total file/dir counts
-            countFiles=0;
-            countDirs=0;
-            // Read the entire directory contents into memory
-            // this function is recursive.
-            readDirectoryTree(rootDirCluster);
-            // lookup 'name.txt' to find volume name
-            wchar_t* nametxt=(wchar_t*)readfilecontents("name.txt");
-            // if errors occur, just ignore them, use default deviceName
-            if (nametxt) {
-                unsigned int filesize=getfilesize("name.txt");
-                char* cbuf=(char*)malloc((filesize+1)*sizeof(char));
-                if (cbuf) {
-                    convertUTF16(cbuf,nametxt,filesize);
-                    deviceName=std::string(cbuf);
-                    free(cbuf);
-                }
-                // return buffer to heap
-                free(nametxt);
-            }
-        }
-        // we're not concerned with other files at the moment, just that they exist
-        fclose(fp);
         // increment to check next file
         fnum++;
     }
+    // total file/dir counts
+    countFiles=0;
+    countDirs=0;
+    // Read the entire directory contents into memory
+    // this function is recursive.
+    readDirectoryTree(rootDirCluster);
+    // lookup 'name.txt' to find volume name
+    wchar_t* nametxt=(wchar_t*)readfilecontents("name.txt");
+    // if errors occur, just ignore them, use default deviceName
+    if (nametxt) {
+        unsigned int filesize=getfilesize("name.txt");
+        char* cbuf=(char*)malloc((filesize+1)*sizeof(char));
+        if (cbuf) {
+            convertUTF16(cbuf,nametxt,filesize);
+            deviceName=std::string(cbuf);
+            free(cbuf);
+        }
+        // return buffer to heap
+        free(nametxt);
+    }
+    // all done! close fp
+    closeAllFiles();
 }
 void XBoxFATX::readClusters(unsigned int startCluster,unsigned char** buffer,unsigned int* bufferlen)
 {
@@ -226,7 +210,6 @@ unsigned char* XBoxFATX::readfilecontents(std::string filename)
     }
     unsigned char* buffer=NULL;
     unsigned int buflen=0;
-    fprintf(stderr,"File: '%s'\n",filename.c_str());
     readClusters(ptr->startCluster,&buffer,&buflen);
     buflen=ptr->filesize;
     buffer=(unsigned char*)realloc(buffer,buflen);
@@ -236,12 +219,12 @@ void XBoxFATX::showinfo()
 {
     printf("Partition ID: %08X\n",partitionID);
     printf(" Device Name: \"%s\"\n",deviceName.c_str());
-    printf("  Total Size: %'luM\n",bytesPerDevice/(1024*1024));
-    printf("   Num files: %d (0000-%04d)\n",lastfile+1,lastfile);
-    printf("Cluster Size: %'uK bytes\n",bytesPerCluster/1024);
-    printf("  Root Dir @: %'u\n",rootDirCluster);
+    printf("  Total Size: %'luMeg (%'.2fGig)\n",bytesPerDevice/ONEMEG,(double)bytesPerDevice/ONEGIG);
+    printf("   Num files: %d (0000 -> %04d)\n",lastfile+1,lastfile);
+    printf("Cluster Size: %'uK bytes\n",bytesPerCluster/ONEKAY);
+    // printf("  Root Dir @: %'u\n",rootDirCluster);
     printf("Num Clusters: %'u\n",totalClusters);
-    printf("UsedClusters: %'u\n",usedClusters);
+    printf("UsedClusters: %'u (%.2f%%)\n",usedClusters,((double)usedClusters*100.0/totalClusters));
     printf("  Total Dirs: %'d\n",countDirs);
     printf(" Total Files: %'d\n",countFiles);
 }

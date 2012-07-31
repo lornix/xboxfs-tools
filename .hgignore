@@ -8,6 +8,8 @@ config.h
 config.log
 config.status
 
+tags
+
 Data[0-9][0-9][0-9][0-9]
 xboxfs
 

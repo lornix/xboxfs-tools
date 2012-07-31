@@ -10,10 +10,21 @@
 #include <string.h>
 
 // clustermap code values
-#define CLUSTEREND 0xFFFFFFFF
-#define CLUSTERID  0xFFFFFFF8
+#define CLUSTEREND (0xFFFFFFFF)
+#define CLUSTERID  (0xFFFFFFF8)
 // max length of directory name entry
 #define DIRNAMELEN (0x2a)
+// useful constants, easier to visualize what's going on
+#define ONEKAY (1024)
+#define ONEMEG (1024*1024)
+#define ONEGIG (1024*1024*1024)
+//
+#define OFFBYTESPERDEVICE (0x240)
+#define BYTESPERSECTOR (512)
+#define DEFAULTBASENAME "Data"
+#define DEFAULTDEVICENAME "Memory Unit"
+#define FATXMAGIC_LE 0x46415458 // "FATX"
+#define FATXMAGIC_BE 0x58544146 // "XTAF"
 
 struct direntries {
     int namelen;
@@ -48,6 +59,8 @@ class XBoxFATX {
      unsigned       int getintBE(  int fnum,long int pos);
      unsigned short int getshortBE(int fnum,long int pos);
      void readdata(int fnum,long int pos,int len,void* buf);
+     void closeAllFiles();
+     void setDefaults();
  private: // variables
      FILE* fp;                  // internal use
      int bytesPerSector;        // usually 512

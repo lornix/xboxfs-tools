@@ -30,6 +30,10 @@
 #define FATXMAGIC_LE      (0x46415458u) // "FATX"
 #define FATXMAGIC_BE      (0x58544146u) // "XTAF"
 
+// utility functions
+void version();
+void usage();
+
 typedef unsigned long int filepos_t;
 
 struct direntry {
@@ -54,8 +58,6 @@ class XBoxFATX {
      bool verbose;              // verbose output?
  public: // methods
      void showinfo();
-     void usage();
-     void version();
      direntry_t* findFileEntry(std::string filename);
      void readDirectoryTree(unsigned int startCluster);
      void readClusters(unsigned int startCluster,unsigned char** dirbuf,filepos_t* buflen);

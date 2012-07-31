@@ -2,8 +2,9 @@
 
 XBoxFATX::XBoxFATX(char* path)
 {
+    // no path given?  Show help and exit
     if (!path) {
-        usage();
+        usage(); // does not return
     }
     // set up initial/default values
     setDefaults();
@@ -294,16 +295,94 @@ void XBoxFATX::zeroClusters()
 }
 int main(int argc __attribute__ ((unused)),char* argv[])
 {
-    // perform setup and initial discovery
-    XBoxFATX xbox=XBoxFATX(argv[1]);
+    // didn't feel like coding getopt/getlongopt stuff right now (apologies),
+    // and most of the options are exclusive and can't be mixed anyways.
     //
-    // determine options used (if any)
-    if ((argc>2)&&(strncmp(argv[2],"--zero",7)==0)) {
-        xbox.verbose=true;
-        xbox.zeroClusters();
+    //  first pass, handle the easy one-shots
+    for (int i=1; i<argc; i++) {
+        // --version | -V
+        if ((strncmp(argv[i],"-V",3)==0)||(strncmp(argv[i],"--version",10)==0)) {
+            version();
+            return EXIT_SUCCESS;
+        }
+        // --help | -h
+        if ((strncmp(argv[i],"-h",3)==0)||(strncmp(argv[i],"--help",7)==0)) {
+            usage(); // does not return
+            // return EXIT_SUCCESS;
+        }
     }
     //
-    xbox.showinfo();
-
-    return 0;
+    // yes, I'm assuming the first option is a path
+    //
+    // perform setup and initial discovery (exits if no data files found)
+    XBoxFATX xbox=XBoxFATX(argv[1]);
+    //
+    if (argc==2) {
+        // only dirpath given, show info
+        xbox.showinfo();
+        return EXIT_SUCCESS;
+    }
+    //
+    // options which are exclusive, each does something and exits
+    for (int i=2; i<argc; i++) {
+        // --verbose | -v
+        if ((strncmp(argv[i],"-v",3)==0)||(strncmp(argv[i],"--verbose",10)==0)) {
+            xbox.verbose=true;
+            continue;
+        }
+        // --zero | (no short version)
+        if ((strncmp(argv[i],"--zero",7)==0)) {
+            xbox.zeroClusters();
+            return EXIT_SUCCESS;
+        }
+        // --info | -i
+        if ((strncmp(argv[i],"-i",3)==0)||(strncmp(argv[i],"--info",7)==0)) {
+            xbox.showinfo();
+            return EXIT_SUCCESS;
+        }
+        // --list [PATH] | -l [PATH]
+        if ((strncmp(argv[i],"-l",3)==0)||(strncmp(argv[i],"--list",7)==0)) {
+            // ANY following argument is ALWAYS taken as the optional
+            // path if present, must obviously be last on line
+            fprintf(stderr,"--list stub\n");
+            return EXIT_SUCCESS;
+        }
+        // --tree [PATH] | -t [PATH]
+        if ((strncmp(argv[i],"-t",3)==0)||(strncmp(argv[i],"--tree",7)==0)) {
+            // ANY following argument is ALWAYS taken as the optional
+            // path if present, must obviously be last on line
+            fprintf(stderr,"--tree stub\n");
+            return EXIT_SUCCESS;
+        }
+        // --dir [PATH] | -d [PATH]
+        if ((strncmp(argv[i],"-d",3)==0)||(strncmp(argv[i],"--dir",6)==0)) {
+            // ANY following argument is ALWAYS taken as the optional
+            // path if present, must obviously be last on line
+            fprintf(stderr,"--dir stub\n");
+            return EXIT_SUCCESS;
+        }
+        // --extract FNAME | -x FNAME
+        if ((strncmp(argv[i],"-x",3)==0)||(strncmp(argv[i],"--extract",10)==0)) {
+            // ANY following argument is ALWAYS taken as the FNAME, also must
+            // be last option on line
+            fprintf(stderr,"--extract stub\n");
+            return EXIT_SUCCESS;
+        }
+        // --store FNAME | -s FNAME
+        if ((strncmp(argv[i],"-s",3)==0)||(strncmp(argv[i],"--store",10)==0)) {
+            // ANY following argument is ALWAYS taken as the FNAME, ALSO also
+            // must be last option on line
+            fprintf(stderr,"--store stub\n");
+            return EXIT_SUCCESS;
+        }
+    }
+    // if we get here, nothing was recognized, if verbose true, show info
+    if (xbox.verbose) {
+        // at least the user was trying...
+        xbox.showinfo();
+        return EXIT_SUCCESS;
+    }
+    // otherwise... we didn't catch anything at all?  Give user a hint
+    fprintf(stderr,"Unknown option, try --help\n");
+    return EXIT_FAILURE;
 }

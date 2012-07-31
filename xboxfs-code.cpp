@@ -105,34 +105,33 @@ std::string XBoxFATX::datafilename(int which)
     fname << which;
     return fname.str();
 }
-void XBoxFATX::version()
+void version()
 {
     fprintf(stderr,"%s: v%s, Compiled: %s %s",PROGNAME,VERSION,__DATE__,__TIME__);
     fprintf(stderr," <%s>\n",AUTHOREMAIL);
 }
-void XBoxFATX::usage()
+void usage()
 {
     version();
     fprintf(stderr,"\n");
-    fprintf(stderr,"%s: v%s, Compiled: %s %s",PROGNAME,VERSION,__DATE__,__TIME__);
-    fprintf(stderr," <%s>\n",AUTHOREMAIL);
-    fprintf(stderr,"\n");
-    fprintf(stderr,"usage: DIR [[--list|--tree|--dir] [path]]\n");
+    fprintf(stderr,"usage: DIR [[--list|--tree|--dir] [path]] [--zero|--info]\n");
     fprintf(stderr,"           [--extract|--store FNAME]\n");
     fprintf(stderr,"           [--verbose] [--help] [--version]\n");
     fprintf(stderr,"\n");
-    fprintf(stderr,"  DIR          Directory containing XBox360 Data files (required)\n");
-    fprintf(stderr,"   --list|l    *List files [from path]\n");
-    fprintf(stderr,"   --tree|t    *List directory tree with files [from path]\n");
-    fprintf(stderr,"   --dir|d     *List directory tree without files [from path]\n");
-    fprintf(stderr,"   --zero      zero unused space (improves compression of files)\n");
-    fprintf(stderr,"   --extract|x *Extract FNAME from device\n");
-    fprintf(stderr,"   --store|s   *Store FNAME in device\n");
+    fprintf(stderr,"  DIR     Directory containing XBox360 Data files (required)\n");
+    fprintf(stderr,"         ==== and exactly one of the following (*) ===\n");
+    fprintf(stderr,"   --list|l    * List files [from path]\n");
+    fprintf(stderr,"   --tree|t    * List directory tree with files [from path]\n");
+    fprintf(stderr,"   --dir|d     * List directory tree without files [from path]\n");
+    fprintf(stderr,"   --extract|x * Extract FNAME from device\n");
+    fprintf(stderr,"   --store|s   * Store FNAME in device\n");
+    fprintf(stderr,"   --info|i    * Show information about device\n");
+    fprintf(stderr,"   --zero      * zero unused space (improves compression of files)\n");
+    fprintf(stderr,"   * should be last option on line, cannot be used with other '*' options\n");
+    fprintf(stderr,"\n");
     fprintf(stderr,"   --verbose|v Be verbose\n");
     fprintf(stderr,"   --help|h    This output\n");
     fprintf(stderr,"   --version|V Version information\n");
-    fprintf(stderr,"\n");
-    fprintf(stderr,"         * possibly not working yet\n");
     fprintf(stderr,"\n");
     exit(1);
 }

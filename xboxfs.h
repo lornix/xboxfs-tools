@@ -58,6 +58,7 @@ class XBoxFATX {
      int rootDirCluster;        // usually 1
      int partitionID;           // from device
      int lastfile;              // derived from device
+     int lastfnum;              // internal use
      int countFiles;            // derived
      int countDirs;             // derived
      long int bytesPerDevice;   // huge! (256M/512M/768M...)

@@ -1,9 +1,11 @@
 #
 # pretty much always want debugging symbols included
 CXXFLAGS+=-g
+#CXXFLAGS+=-pg
 # yell out all warnings and whatnot
 CXXFLAGS+=-Wall -Wextra -Wunused
 # make all warnings into errors
+#CXXFLAGS+=-fprofile-arcs -ftest-coverage
 #CXXFLAGS+=-Werror
 # optimize!
 #CXXFLAGS+=-O3

@@ -32,18 +32,26 @@ XBoxFATX::XBoxFATX(char* path)
         }
         // grab info while files are open
         if (fnum==0) {
+            // Data0000
+            // how big is this device?
             bytesPerDevice=getlongBE(fnum,0x240);
-            // determine how many files total (Data0002->DataXXXX)
+            // determine how many Data???? files total (Data0002->DataXXXX)
             lastfile=(bytesPerDevice/(1024*1024*1024))+2;
         }
         else if (fnum==1) {
+            // Data0001
             // make sure it has the magic header (XTAF=FATX)
+            // oddly, it's in LE order, while rest of file is BE
             if (getintBE(fnum,0x0)!=0x58544146) {
                 fprintf(stderr,"Magic 'XTAF' header not found\n");
             }
+            // 8 hex digit partition ID
             partitionID=getintBE(fnum,0x04);
+            // how big is each 'chunk'
             sectorsPerCluster=getintBE(fnum,0x08);
+            // where does the root directory begin?
             rootDirCluster=getintBE(fnum,0x0c);
+            // makes it easier to determine file offsets
             bytesPerCluster=sectorsPerCluster*bytesPerSector;
             totalClusters=(bytesPerDevice/bytesPerCluster);
             // read in the cluster map
@@ -54,14 +62,17 @@ XBoxFATX::XBoxFATX(char* path)
                     usedClusters++;
                 }
             }
-            // remove count for the '0'th entry and root dir
+            // decrement for the '0'th entry and root dir's first (only?) cluster
             usedClusters-=2;
         }
         else if (fnum==2) {
-            // total counts
+            // Data0002
+            // total file/dir counts
             countFiles=0;
             countDirs=0;
             // Read the entire directory contents into memory
+            // this function is recursive.
+            fprintf(stderr,"read DirTree\n");
             readDirectoryTree(rootDirCluster);
             // lookup 'name.txt' to find volume name
             wchar_t* nametxt=(wchar_t*)readfilecontents("name.txt");
@@ -74,6 +85,8 @@ XBoxFATX::XBoxFATX(char* path)
                     deviceName=std::string(cbuf);
                     free(cbuf);
                 }
+                // return buffer to heap
+                free(nametxt);
             }
         }
         // we're not concerned with other files at the moment, just that they exist
@@ -94,6 +107,7 @@ void XBoxFATX::readClusters(unsigned int startCluster,unsigned char** buffer,uns
         numclusters++;
         // make buffer the right size
         buflen=(bytesPerCluster*numclusters);
+        fprintf(stderr,"Realloc to %#x bytes\n",buflen);
         clusterbuf=(unsigned char*)realloc(clusterbuf,buflen);
         if (!clusterbuf) {
             perror("readClusters - Malloc");
@@ -103,6 +117,7 @@ void XBoxFATX::readClusters(unsigned int startCluster,unsigned char** buffer,uns
         long int offset=(long int)clusterbuf+((numclusters-1)*bytesPerCluster);
         readdata(2,clusterPos,bytesPerCluster,(void*)offset);
         // move to next cluster
+        fprintf(stderr,"Read cluster: %u (total: %d)\n",currentCluster,numclusters);
         currentCluster=clustermap[currentCluster];
     }
     *buffer=clusterbuf;
@@ -209,6 +224,7 @@ unsigned char* XBoxFATX::readfilecontents(std::string filename)
     }
     unsigned char* buffer=NULL;
     unsigned int buflen=0;
+    fprintf(stderr,"File: '%s'\n",filename.c_str());
     readClusters(ptr->startCluster,&buffer,&buflen);
     buflen=ptr->filesize;
     buffer=(unsigned char*)realloc(buffer,buflen);

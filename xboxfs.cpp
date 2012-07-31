@@ -6,9 +6,12 @@ XBoxFATX::XBoxFATX(char* path)
         usage();
     }
     // useful defaults
+    // Could be assumed, but just in case
     bytesPerSector=512;
+    // Basename of the data files
     databasename="Data";
-    deviceName="--No-Name-Found--";
+    // default device name
+    deviceName="Memory Unit";
     //
     // set locale so we get thousands grouping
     setlocale(LC_ALL,"");
@@ -57,7 +60,9 @@ XBoxFATX::XBoxFATX(char* path)
             // read in the cluster map
             usedClusters=0;
             for (int num=0; num<totalClusters; num++) {
-                clustermap.push_back(getintBE(fnum,num*(sizeof(unsigned int))+0x1000));
+                int offset=(num*sizeof(unsigned int))+0x1000;
+                int retval=getintBE(fnum,offset);
+                clustermap.push_back(retval);
                 if (clustermap[num]!=0) {
                     usedClusters++;
                 }
@@ -72,7 +77,6 @@ XBoxFATX::XBoxFATX(char* path)
             countDirs=0;
             // Read the entire directory contents into memory
             // this function is recursive.
-            fprintf(stderr,"read DirTree\n");
             readDirectoryTree(rootDirCluster);
             // lookup 'name.txt' to find volume name
             wchar_t* nametxt=(wchar_t*)readfilecontents("name.txt");
@@ -107,7 +111,6 @@ void XBoxFATX::readClusters(unsigned int startCluster,unsigned char** buffer,uns
         numclusters++;
         // make buffer the right size
         buflen=(bytesPerCluster*numclusters);
-        fprintf(stderr,"Realloc to %#x bytes\n",buflen);
         clusterbuf=(unsigned char*)realloc(clusterbuf,buflen);
         if (!clusterbuf) {
             perror("readClusters - Malloc");
@@ -117,7 +120,6 @@ void XBoxFATX::readClusters(unsigned int startCluster,unsigned char** buffer,uns
         long int offset=(long int)clusterbuf+((numclusters-1)*bytesPerCluster);
         readdata(2,clusterPos,bytesPerCluster,(void*)offset);
         // move to next cluster
-        fprintf(stderr,"Read cluster: %u (total: %d)\n",currentCluster,numclusters);
         currentCluster=clustermap[currentCluster];
     }
     *buffer=clusterbuf;
@@ -228,7 +230,6 @@ unsigned char* XBoxFATX::readfilecontents(std::string filename)
     readClusters(ptr->startCluster,&buffer,&buflen);
     buflen=ptr->filesize;
     buffer=(unsigned char*)realloc(buffer,buflen);
-    // fprintf(stderr,"Read '%s', Start: %d, bytes: %#x\n",(ptr->name).c_str(),ptr->startCluster,buflen);
     return buffer;
 }
 void XBoxFATX::showinfo()

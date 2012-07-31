@@ -10,6 +10,8 @@ void XBoxFATX::readdata(int fnum,long int pos,int len,void* buf)
         // if position > 1GIG, make sure fnum is right
         // xbox puts 1Gig per file
         fnum=(pos/(1024*1024*1024))+2;
+        // Make the position represent WITHIN the respective file
+        pos=pos-((fnum-2)*1024*1024*1024);
     }
     if (fnum!=lastfnum) {
         // haven't read this file before, set up fp
@@ -21,10 +23,10 @@ void XBoxFATX::readdata(int fnum,long int pos,int len,void* buf)
         fp=fopen(fname.c_str(),"rb");
         lastfnum=fnum;
     }
-    fprintf(stderr,"readdata: %d: (%d) %04lx\n",fnum,len,pos);
+    // zero out the buffer, prevents data leakage
+    memset(buf,0,len);
     if ((fp)&&(!fseek(fp,pos,SEEK_SET))) {
-        int retval=fread(buf,len,1,fp);
-        fprintf(stderr,"fread result: %d\n",retval);
+        fread(buf,len,1,fp);
     }
 }
 unsigned long int XBoxFATX::getlongBE(int fnum,long int pos)

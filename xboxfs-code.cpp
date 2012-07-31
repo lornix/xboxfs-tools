@@ -122,7 +122,7 @@ void XBoxFATX::usage()
     fprintf(stderr,"   -l  * List files\n");
     fprintf(stderr,"   -t  * List directory tree with files\n");
     fprintf(stderr,"   -d  * List directory tree without files\n");
-    fprintf(stderr,"   --clear zero unused clusters\n");
+    fprintf(stderr,"   --zero  zero unused clusters\n");
     fprintf(stderr,"\n");
     fprintf(stderr,"       * possibly not working yet\n");
     fprintf(stderr,"\n");

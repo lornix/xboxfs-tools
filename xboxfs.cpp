@@ -264,7 +264,7 @@ void XBoxFATX::zeroClusters()
                     prevpercent=percent;
                 }
             }
-            filepos_t clusterPos=(i-1)*bytesPerCluster;
+            filepos_t clusterPos=((filepos_t)(i-1)*(filepos_t)bytesPerCluster);
             writedata(2,clusterPos,bytesPerCluster,zerobuf);
         }
     }
@@ -277,7 +277,7 @@ int main(int argc __attribute__ ((unused)),char* argv[])
     // perform setup and initial testing
     XBoxFATX xbox=XBoxFATX(argv[1]);
     //
-    if ((argc>2)&&(strncmp(argv[2],"--clear",8)==0)) {
+    if ((argc>2)&&(strncmp(argv[2],"--zero",7)==0)) {
         xbox.verbose=true;
         xbox.zeroClusters();
     }

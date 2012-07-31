@@ -45,12 +45,12 @@ class XBoxFATX {
  public: // methods
      std::string datafilename(int which);
      void showinfo();
-     unsigned char* readfilecontents(std::string filename);
-     unsigned int getfilesize(std::string filename);
      void usage();
      void readDirectoryTree(unsigned int startCluster);
      void readClusters(unsigned int startCluster,unsigned char** dirbuf,unsigned int* buflen);
      void convertUTF16(char* outstr,wchar_t* instr,unsigned int len);
+     unsigned int getfilesize(std::string filename);
+     unsigned char* readfilecontents(std::string filename);
  public: // -structors
      XBoxFATX(char* path);
      ~XBoxFATX();
@@ -62,22 +62,21 @@ class XBoxFATX {
      void closeAllFiles();
      void setDefaults();
  private: // variables
-     FILE* fp;                  // internal use
-     int bytesPerSector;        // usually 512
      int sectorsPerCluster;     // from device: 32    (0x0020)
      int bytesPerCluster;       // from device: 16384 (0x4000)
      int totalClusters;         // derived
      int usedClusters;          // derived
      int rootDirCluster;        // usually 1
      int partitionID;           // from device
-     int lastfile;              // derived from device
-     int lastfnum;              // internal use
      int countFiles;            // derived
      int countDirs;             // derived
+     int lastfile;              // derived from device
+     int lastfnum;              // internal use
+     FILE* fp;                  // internal use
      long int bytesPerDevice;   // huge! (256M/512M/768M...)
      std::string deviceName;    // from device
-     std::string databasename;  // "Data"
-     std::string dirpath;       // derived
+     bool deviceNameSet;        // internal use
+     std::string dirpath;       // supplied by user
      std::vector<unsigned int>clustermap;   // from device
      std::vector<struct direntries>dirtree; // from device
 };

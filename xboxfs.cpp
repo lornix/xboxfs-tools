@@ -42,7 +42,7 @@ XBoxFATX::XBoxFATX(char* path)
             // where does the root directory begin?
             rootDirCluster=getintBE(fnum,0x0c);
             // makes it easier to determine file offsets
-            bytesPerCluster=sectorsPerCluster*bytesPerSector;
+            bytesPerCluster=sectorsPerCluster*BYTESPERSECTOR;
             totalClusters=(bytesPerDevice/bytesPerCluster);
             // read in the cluster map
             usedClusters=0;
@@ -75,6 +75,7 @@ XBoxFATX::XBoxFATX(char* path)
         if (cbuf) {
             convertUTF16(cbuf,nametxt,filesize);
             deviceName=std::string(cbuf);
+            deviceNameSet=true;
             free(cbuf);
         }
         // return buffer to heap
@@ -217,16 +218,16 @@ unsigned char* XBoxFATX::readfilecontents(std::string filename)
 }
 void XBoxFATX::showinfo()
 {
-    printf("Partition ID: %08X\n",partitionID);
-    printf(" Device Name: \"%s\"\n",deviceName.c_str());
-    printf("  Total Size: %'luMeg (%'.2fGig)\n",bytesPerDevice/ONEMEG,(double)bytesPerDevice/ONEGIG);
-    printf("   Num files: %d (0000 -> %04d)\n",lastfile+1,lastfile);
-    printf("Cluster Size: %'uK bytes\n",bytesPerCluster/ONEKAY);
+    printf("  Partition ID: %08X\n",partitionID);
+    printf("   Device Name: \"%s\"%s",deviceName.c_str(),deviceNameSet?"\n":" (unnamed unit)\n");
+    printf("    Total Size: %'luMeg (%'.2fGig)\n",bytesPerDevice/ONEMEG,(double)bytesPerDevice/ONEGIG);
+    printf("Num Data files: (0000 -> %04d) %d\n",lastfile,lastfile+1);
+    printf(" Used Clusters: %'8u (%.2f%% used)\n",usedClusters,((double)usedClusters*100.0/totalClusters));
+    printf("Total Clusters: %'8u\n",totalClusters);
+    printf("    File count: %'8d\n",countFiles);
+    printf("     Dir count: %'8d\n",countDirs);
+    // printf("Cluster Size: %'uK bytes\n",bytesPerCluster/ONEKAY);
     // printf("  Root Dir @: %'u\n",rootDirCluster);
-    printf("Num Clusters: %'u\n",totalClusters);
-    printf("UsedClusters: %'u (%.2f%%)\n",usedClusters,((double)usedClusters*100.0/totalClusters));
-    printf("  Total Dirs: %'d\n",countDirs);
-    printf(" Total Files: %'d\n",countFiles);
 }
 int main(int argc __attribute__ ((unused)),char* argv[])
 {

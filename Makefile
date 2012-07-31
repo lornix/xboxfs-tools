@@ -3,7 +3,7 @@
 CXXFLAGS+=-g
 #CXXFLAGS+=-pg
 # yell out all warnings and whatnot
-CXXFLAGS+=-Wall -Wextra -Wunused
+CXXFLAGS+=-Wall -Wextra -Wunused -Wundef
 # make all warnings into errors
 #CXXFLAGS+=-fprofile-arcs -ftest-coverage
 #CXXFLAGS+=-Werror

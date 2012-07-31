@@ -8,12 +8,9 @@ XBoxFATX::~XBoxFATX()
 void XBoxFATX::setDefaults()
 {
     // useful defaults
-    // Could be assumed, but just in case
-    bytesPerSector=BYTESPERSECTOR;
-    // Basename of the data files
-    databasename=DEFAULTBASENAME;
     // default device name
     deviceName=DEFAULTDEVICENAME;
+    deviceNameSet=false;
     // internal values
     lastfnum=-1;
     fp=NULL;
@@ -91,7 +88,7 @@ unsigned short int XBoxFATX::getshortBE(int fnum,long int pos)
 std::string XBoxFATX::datafilename(int which)
 {
     std::stringstream fname;
-    fname << dirpath << databasename;
+    fname << dirpath << DEFAULTBASENAME;
     fname.width(4);
     fname.fill('0');
     fname << which;

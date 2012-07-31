@@ -23,7 +23,9 @@
 #define ONEMEG (1024*1024lu)
 #define ONEGIG (1024*1024*1024lu)
 //
+#define FIRSTDATAFILE     (2)
 #define DEFAULTBASENAME   "Data"
+#define DEFAULTFILESIZE   (ONEGIG)
 #define DEFAULTDEVICENAME "Memory Unit"
 #define BYTESPERSECTOR    (512)
 #define OFFBYTESPERDEVICE (0x240)
@@ -74,6 +76,7 @@ class XBoxFATX {
  private: // variables
      unsigned int sectorsPerCluster;        // from device: 32    (0x0020)
      unsigned int bytesPerCluster;          // from device: 16384 (0x4000)
+     unsigned int clustersPerFile;          // derived
      unsigned int totalClusters;            // derived
      unsigned int usedClusters;             // derived
      unsigned int rootDirCluster;           // usually 1
@@ -83,7 +86,7 @@ class XBoxFATX {
      unsigned int lastfile;                 // derived from device
      int lastfnum;                          // internal use
      FILE* fp;                              // internal use
-     unsigned long int bytesPerDevice;      // huge! (256M/512M/768M...)
+     unsigned long int bytesPerDevice;      // huge! (256M/512M...8G/16G)
      std::string deviceName;                // from device
      bool deviceNameSet;                    // internal use
      std::string dirpath;                   // supplied by user

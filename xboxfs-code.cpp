@@ -15,16 +15,18 @@ void XBoxFATX::setDefaults()
     fp=NULL;
     lastfnum=-1;
     //
+    verbose=false;
+    //
     // set locale so we get thousands grouping
     setlocale(LC_ALL,"");
 }
 void XBoxFATX::selectfile(int fnum,filepos_t pos)
 {
-    if ((fnum>=2)&&(pos>=ONEGIG)) {
+    if ((fnum>=FIRSTDATAFILE)&&(pos>=ONEGIG)) {
         // xbox puts 1Gig per file
         // if position > 1GIG, fix fnum
         // integer division, no fractional part
-        fnum=(pos/ONEGIG)+2;
+        fnum=(pos/ONEGIG)+FIRSTDATAFILE;
         // Make the position represent WITHIN the respective file
         pos=pos%ONEGIG;
     }

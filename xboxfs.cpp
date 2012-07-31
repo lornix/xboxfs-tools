@@ -15,7 +15,7 @@ XBoxFATX::XBoxFATX(char* path)
     }
     //
     // check for existence and readability of Data0/1/2...
-    lastfile=2;
+    lastfile=FIRSTDATAFILE;
     unsigned int fnum=0;
     while (fnum<=lastfile) {
         // dummy read to pull file (if it exists!) into memory
@@ -26,7 +26,7 @@ XBoxFATX::XBoxFATX(char* path)
             // how big is this device?
             bytesPerDevice=getlongBE(fnum,OFFBYTESPERDEVICE);
             // determine how many Data???? files total (Data0002->DataXXXX)
-            lastfile=(bytesPerDevice/ONEGIG)+2;
+            lastfile=(bytesPerDevice/DEFAULTFILESIZE)+FIRSTDATAFILE;
         }
         else if (fnum==1) {
             // Data0001
@@ -44,9 +44,10 @@ XBoxFATX::XBoxFATX(char* path)
             // makes it easier to determine file offsets
             bytesPerCluster=sectorsPerCluster*BYTESPERSECTOR;
             totalClusters=(bytesPerDevice/bytesPerCluster);
+            clustersPerFile=(DEFAULTFILESIZE/bytesPerCluster);
             // read in the cluster map
             usedClusters=0;
-            for (unsigned int num=0; num<totalClusters; num++) {
+            for (unsigned int num=0; num<(totalClusters+1); num++) {
                 filepos_t offset=(num*sizeof(unsigned int))+0x1000;
                 int retval=getintBE(fnum,offset);
                 clustermap.push_back(retval);
@@ -106,7 +107,7 @@ void XBoxFATX::readClusters(unsigned int startCluster,unsigned char** buffer,fil
         }
         // read new cluster
         unsigned char* offset=clusterbuf+((numclusters-1)*bytesPerCluster);
-        readdata(2,clusterPos,bytesPerCluster,offset);
+        readdata(FIRSTDATAFILE,clusterPos,bytesPerCluster,offset);
         // move to next cluster
         currentCluster=clustermap[currentCluster];
     }
@@ -234,7 +235,7 @@ void XBoxFATX::showinfo()
     printf("   Device Name: \"%s\"%s",deviceName.c_str(),deviceNameSet?"\n":" (unnamed unit)\n");
     printf("    Total Size: %'luMeg (%'.2fGig)\n",bytesPerDevice/ONEMEG,(double)bytesPerDevice/ONEGIG);
     printf("Num Data files: (0000 -> %04d) => %d\n",lastfile,lastfile+1);
-    printf(" Used Clusters: %'8u (%.2f%% used)\n",usedClusters,((double)usedClusters*100.0/totalClusters));
+    printf(" Used Clusters: %'8u (%.1f%% used)\n",usedClusters,((double)usedClusters*100.0/totalClusters));
     printf("Total Clusters: %'8u\n",totalClusters);
     printf("    File count: %'8d\n",countFiles);
     printf("     Dir count: %'8d\n",countDirs);
@@ -250,27 +251,29 @@ void XBoxFATX::zeroClusters()
     }
     // fill with zeros
     memset(zerobuf,0,bytesPerCluster);
-    if (verbose) {
-        printf("Zeroing Clusters:\r");
-    }
-    float prevpercent=0.0;
+    //
+    double prevpercent=0.0;
     // find all unallocated clusters, write zeros to each cluster
-    for (unsigned int i=0; i<clustermap.size(); i++) {
+    // performed in REVERSE order so most likely used files end up in the cache
+    for (unsigned int i=clustermap.size(); i>0; i--) {
         if (clustermap[i]==0) {
             if (verbose) {
-                float percent=floorf((float)i*1000.0/clustermap.size())/10.0;
+                double percent=100.0-(floor((double)i*1000.0/clustermap.size())/10.0);
                 if (percent>prevpercent) {
-                    printf("Zeroing Clusters: %4.1f%%\r",percent);
+                    printf("\rClearing Free Space: (%u) %4.1f%% ",FIRSTDATAFILE+(i/clustersPerFile),percent);
+                    fflush(stdout);
                     prevpercent=percent;
                 }
             }
             filepos_t clusterPos=((filepos_t)(i-1)*(filepos_t)bytesPerCluster);
-            writedata(2,clusterPos,bytesPerCluster,zerobuf);
+            writedata(FIRSTDATAFILE,clusterPos,bytesPerCluster,zerobuf);
         }
     }
     if (verbose) {
-        printf("All unused clusters zeroed\n");
+        printf("\rAll unused space cleared      \n");
     }
+    free(zerobuf);
+    closeAllFiles();
 }
 int main(int argc __attribute__ ((unused)),char* argv[])
 {

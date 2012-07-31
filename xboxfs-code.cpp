@@ -13,7 +13,7 @@ void XBoxFATX::setDefaults()
     deviceNameSet=false;
     // internal values
     fp=NULL;
-    lastfnum=-1;
+    currentfnum=-1;
     //
     verbose=false;
     //
@@ -30,20 +30,21 @@ void XBoxFATX::selectfile(int fnum,filepos_t pos)
         // Make the position represent WITHIN the respective file
         pos=pos%ONEGIG;
     }
-    if ((!fp)||(fnum!=lastfnum)) {
+    if ((!fp)||(fnum!=currentfnum)) {
         // haven't accessed this file before, set up fp
         // close currently open file
         if (fp) {
             fclose(fp);
         }
         std::string fname=datafilename(fnum);
+        // open for binary read/write (binary for OTHER OS's)
         fp=fopen(fname.c_str(),"rb+");
         // if not found, fail
         if (!fp) {
             perror(fname.c_str());
             exit(1);
         }
-        lastfnum=fnum;
+        currentfnum=fnum;
     }
     if ((fp)&&(fseek(fp,pos,SEEK_SET))) {
         perror("selectfile-fseek");
@@ -75,7 +76,7 @@ void XBoxFATX::closeAllFiles()
         fclose(fp);
     }
     fp=NULL;
-    lastfnum=-1;
+    currentfnum=-1;
 }
 unsigned long int XBoxFATX::getlongBE(int fnum,filepos_t pos)
 {
@@ -95,16 +96,6 @@ unsigned int XBoxFATX::getintBE(int fnum,filepos_t pos)
     readdata(fnum,pos,sizeof(valueBE),&valueBE);
     return be32toh(valueBE);
 }
-// never used (lornix)
-// unsigned short int XBoxFATX::getshortBE(int fnum,filepos_t pos)
-// {
-//     // dummy value, shouldn't show up
-//     unsigned short int valueBE=0xadde; // 0xDEAD
-//     // just to make sure, we need 16 bit length here
-//     assert(sizeof(valueBE)==2);
-//     readdata(fnum,pos,sizeof(valueBE),&valueBE);
-//     return be16toh(valueBE);
-// }
 std::string XBoxFATX::datafilename(int which)
 {
     std::stringstream fname;
@@ -114,19 +105,34 @@ std::string XBoxFATX::datafilename(int which)
     fname << which;
     return fname.str();
 }
+void XBoxFATX::version()
+{
+    fprintf(stderr,"%s: v%s, Compiled: %s %s",PROGNAME,VERSION,__DATE__,__TIME__);
+    fprintf(stderr," <%s>\n",AUTHOREMAIL);
+}
 void XBoxFATX::usage()
 {
-    fprintf(stderr,"%s: v%s, Compiled: %s %s\n",PROGNAME,VERSION,__DATE__,__TIME__);
+    version();
     fprintf(stderr,"\n");
-    fprintf(stderr,"usage: DIR [-l|-t|-d]\n");
+    fprintf(stderr,"%s: v%s, Compiled: %s %s",PROGNAME,VERSION,__DATE__,__TIME__);
+    fprintf(stderr," <%s>\n",AUTHOREMAIL);
     fprintf(stderr,"\n");
-    fprintf(stderr,"  DIR  Directory containing XBox360 Data files (required)\n");
-    fprintf(stderr,"   -l  * List files\n");
-    fprintf(stderr,"   -t  * List directory tree with files\n");
-    fprintf(stderr,"   -d  * List directory tree without files\n");
-    fprintf(stderr,"   --zero  zero unused clusters\n");
+    fprintf(stderr,"usage: DIR [[--list|--tree|--dir] [path]]\n");
+    fprintf(stderr,"           [--extract|--store FNAME]\n");
+    fprintf(stderr,"           [--verbose] [--help] [--version]\n");
     fprintf(stderr,"\n");
-    fprintf(stderr,"       * possibly not working yet\n");
+    fprintf(stderr,"  DIR          Directory containing XBox360 Data files (required)\n");
+    fprintf(stderr,"   --list|l    *List files [from path]\n");
+    fprintf(stderr,"   --tree|t    *List directory tree with files [from path]\n");
+    fprintf(stderr,"   --dir|d     *List directory tree without files [from path]\n");
+    fprintf(stderr,"   --zero      zero unused space (improves compression of files)\n");
+    fprintf(stderr,"   --extract|x *Extract FNAME from device\n");
+    fprintf(stderr,"   --store|s   *Store FNAME in device\n");
+    fprintf(stderr,"   --verbose|v Be verbose\n");
+    fprintf(stderr,"   --help|h    This output\n");
+    fprintf(stderr,"   --version|V Version information\n");
+    fprintf(stderr,"\n");
+    fprintf(stderr,"         * possibly not working yet\n");
     fprintf(stderr,"\n");
     exit(1);
 }

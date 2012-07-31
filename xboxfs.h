@@ -11,33 +11,33 @@
 #include <string.h>
 
 // my info
-#define AUTHORNAME  "L. R. Nix"
+#define AUTHORNAME  "L. R. Nix"         // it's me, Mario!
 #define AUTHOREMAIL "lornix@lornix.com"
 // clustermap code values
-#define CLUSTEREND (0xFFFFFFFFu)
-#define CLUSTERID  (0xFFFFFFF8u)
-// max length of directory name entry
-#define DIRNAMELEN (0x2a)
+#define CLUSTEREND (0xFFFFFFFFu)        // value for 'end-of-chain' in clustermap
+#define ROOTDIRID  (0xFFFFFFF8u)        // Not used, yet
 // useful constants, easier to visualize what's going on
-#define ONEKAY (1024lu)
-#define ONEMEG (1024*1024lu)
+#define ONEKAY           (1024lu)       // ok, so how would YOU spell it?
+#define ONEMEG      (1024*1024lu)
 #define ONEGIG (1024*1024*1024lu)
 //
+#define VOLNAMEFILE       "name.txt"
 #define FIRSTDATAFILE     (2)
 #define DEFAULTBASENAME   "Data"
 #define DEFAULTFILESIZE   (ONEGIG)
 #define DEFAULTDEVICENAME "Memory Unit"
-#define BYTESPERSECTOR    (512)
-#define OFFBYTESPERDEVICE (0x240)
-#define FATXMAGIC_LE      (0x46415458lu) // "FATX"
-#define FATXMAGIC_BE      (0x58544146lu) // "XTAF"
+#define BYTESPERSECTOR    (512)         // it could change, right?
+#define FATXMAGIC_LE      (0x46415458u) // "FATX"
+#define FATXMAGIC_BE      (0x58544146u) // "XTAF"
 
 typedef unsigned long int filepos_t;
 
-struct direntries {
+struct direntry {
+    int nestlevel;
     int attributes;
     std::string name;
     unsigned int startCluster;
+    unsigned int parentCluster;
     filepos_t filesize;
     unsigned short int createDate;
     unsigned short int createTime;
@@ -45,51 +45,53 @@ struct direntries {
     unsigned short int lwriteTime;
     unsigned short int accessDate;
     unsigned short int accessTime;
-    int nestlevel;
 };
+
+typedef struct direntry direntry_t;
 
 class XBoxFATX {
  public: // variables
      bool verbose;              // verbose output?
  public: // methods
-     std::string datafilename(int which);
      void showinfo();
      void usage();
+     void version();
+     direntry_t* findFileEntry(std::string filename);
      void readDirectoryTree(unsigned int startCluster);
      void readClusters(unsigned int startCluster,unsigned char** dirbuf,filepos_t* buflen);
      void convertUTF16(char* outstr,wchar_t* instr,unsigned int len);
      void zeroClusters();
-     filepos_t getfilesize(std::string filename);
      unsigned char* readfilecontents(std::string filename);
+     filepos_t getfilesize(std::string filename);
  public: // -structors
      XBoxFATX(char* path);
      ~XBoxFATX();
- private: // methods
-     unsigned long  int getlongBE( int fnum,filepos_t pos);
-     unsigned       int getintBE(  int fnum,filepos_t pos);
-     // unsigned short int getshortBE(int fnum,filepos_t pos);
-     void  readdata(int fnum,filepos_t pos,filepos_t len,void* buf);
-     void writedata(int fnum,filepos_t pos,filepos_t len,void* buf);
-     void closeAllFiles();
-     void setDefaults();
-     void selectfile(int fnum,filepos_t pos);
  private: // variables
      unsigned int sectorsPerCluster;        // from device: 32    (0x0020)
      unsigned int bytesPerCluster;          // from device: 16384 (0x4000)
-     unsigned int clustersPerFile;          // derived
-     unsigned int totalClusters;            // derived
-     unsigned int usedClusters;             // derived
+     unsigned int clustersPerFile;          // figured from device size
+     unsigned int totalClusters;            // figured from device size
+     unsigned int usedClusters;             // figured from cluster table
      unsigned int rootDirCluster;           // usually 1
      unsigned int partitionID;              // from device
-     unsigned int countFiles;               // derived
-     unsigned int countDirs;                // derived
-     unsigned int lastfile;                 // derived from device
-     int lastfnum;                          // internal use
-     FILE* fp;                              // internal use
-     unsigned long int bytesPerDevice;      // huge! (256M/512M...8G/16G)
-     std::string deviceName;                // from device
-     bool deviceNameSet;                    // internal use
-     std::string dirpath;                   // supplied by user
-     std::vector<unsigned int>clustermap;   // from device
-     std::vector<struct direntries>dirtree; // from device
+     unsigned int countFiles;               // count of files on device
+     unsigned int countDirs;                // count of dirs on device
+     unsigned int lastfile;                 // number of last data file
+     int currentfnum;                       // which file currently open
+     FILE* fp;                              // FILE* for current file
+     filepos_t bytesPerDevice;              // huge! (256M/512M...8G/16G)
+     std::string deviceName;                // read from name.txt (if found)
+     bool deviceNameSet;                    // did we find name.txt to use?
+     std::string dirpath;                   // where to find data files
+     std::vector<unsigned int>clustermap;   // built from device
+     std::vector<struct direntry>dirtree;   // built from device
+ private: // methods
+     unsigned long  int getlongBE( int fnum,filepos_t pos);
+     unsigned       int getintBE(  int fnum,filepos_t pos);
+     void  readdata(int fnum,filepos_t pos,filepos_t len,void* buf);
+     void writedata(int fnum,filepos_t pos,filepos_t len,void* buf);
+     void setDefaults();
+     void closeAllFiles();
+     void selectfile(int fnum,filepos_t pos);
+     std::string datafilename(int which);
 };

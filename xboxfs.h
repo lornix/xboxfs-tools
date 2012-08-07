@@ -46,13 +46,13 @@ void usage();
 typedef unsigned long int filepos_t;
 
 struct direntry {
-    int nestlevel;
-    int attributes;
     bool isdir;
     std::string name;
+    filepos_t filesize;
+    unsigned int nestlevel;
+    unsigned int attributes;
     unsigned int startCluster;
     unsigned int parentCluster;
-    filepos_t filesize;
     unsigned short int createDate;
     unsigned short int createTime;
     unsigned short int lwriteDate;
@@ -91,6 +91,7 @@ class XBoxFATX {
      unsigned int countDirs;                // count of dirs on device
      unsigned int lastfile;                 // number of last data file
      unsigned int currentfnum;              // which file currently open
+     unsigned int nestlevel;                // depth of dir tree
      FILE* fp;                              // FILE* for current file
      filepos_t bytesPerDevice;              // huge! (256M/512M...8G/16G)
      std::string deviceName;                // read from name.txt (if found)

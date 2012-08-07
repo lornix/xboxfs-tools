@@ -11,7 +11,6 @@ int XBoxFATX::showtree(std::string startpath,bool showfiles)
         while (entry!=dirtree.end()) {
             if (entry->isdir) {
                 bool regexresult=std::regex_match(entry->name,findregex);
-                fprintf(stderr,"searching: '%s' =%d= '%s/'\n",startpath.c_str(),regexresult,entry->name.c_str());
                 if (regexresult) {
                     break;
                 }
@@ -23,8 +22,50 @@ int XBoxFATX::showtree(std::string startpath,bool showfiles)
         fprintf(stderr,"Path '%s' not found\n",startpath.c_str());
         return EXIT_FAILURE;
     }
-    fprintf(stderr,"showfiles=%d\n",showfiles);
-    fprintf(stderr,"First entry: %s\n",entry->name.c_str());
+    unsigned int currentnest=0;
+    // we have start entry, begin showing
+    // start with display of dir name
+    if (entry!=dirtree.begin()) {
+        printf("%s",entry->name.c_str());
+        currentnest=entry->nestlevel;
+    }
+    printf("/\n");
+    if (entry!=dirtree.begin()) {
+        entry++;
+    }
+    while ((entry!=dirtree.end())&&(entry->nestlevel>currentnest)) {
+        int indent=(entry->nestlevel-currentnest);
+        if ((entry->isdir)||(showfiles)) {
+            while (indent>1) {
+                printf("    ");
+                --indent;
+            }
+            if (indent==1) {
+                printf("\u2514\u2500\u2500\u2500");
+                --indent;
+            }
+            printf("\"%s\"",entry->name.c_str());
+            if (!entry->isdir) {
+                if (entry->filesize>=ONEGIG) {
+                    printf("  (%'.2fGB)",((double)entry->filesize/ONEGIG));
+                }
+                else if (entry->filesize>=ONEMEG) {
+                    printf("  (%'.2fMB)",((double)entry->filesize/ONEMEG));
+                }
+                else if (entry->filesize>=ONEKAY) {
+                    printf("  (%'.2fKB)",((double)entry->filesize/ONEKAY));
+                }
+                else {
+                    printf("  (%'luB)",entry->filesize);
+                }
+            }
+            if (entry->isdir) {
+                printf("/");
+            }
+            printf("\n");
+        }
+        ++entry;
+    }
     return EXIT_SUCCESS;
 }
 XBoxFATX::XBoxFATX(char* path)
@@ -174,7 +215,6 @@ void XBoxFATX::readDirectoryTree(unsigned int startCluster)
 {
     // this'll be recursive, reading each cluster, scanning for entries
     // and calling itself when it finds a directory entry
-    int nestlevel=0;
     filepos_t buflen=0;
     unsigned char* dirbuf=NULL;
     readClusters(startCluster,&dirbuf,&buflen);

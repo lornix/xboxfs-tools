@@ -16,6 +16,7 @@ void XBoxFATX::setDefaults()
     currentfnum=999; // waaaay out of possible values
     //
     verbose=false;
+    nestlevel=1;
     //
     // set locale so we get thousands grouping
     setlocale(LC_ALL,"");

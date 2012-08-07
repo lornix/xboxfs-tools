@@ -327,6 +327,28 @@ void XBoxFATX::showinfo()
     printf("     Num Files: %'*d\n",width,countFiles);
     printf("      Num Dirs: %'*d\n",width,countDirs);
     // printf("    Root Dir @: %'*u\n",width,rootDirCluster);
+    printf("\n");
+    printf("      Data0000: %'*d.0%% Bookkeeping?\n",width,100);
+    printf("      Data0001: %'*d.0%% FATX Cluster Map\n",width,100);
+    for (unsigned int fnum=2; fnum<=lastfile; ++fnum) {
+        unsigned int clustercount=0;
+        unsigned int clustersThisFile=0;
+        for (unsigned int cluster=((fnum-2)*clustersPerFile)+2*(fnum==2);
+                ((cluster<=totalClusters)&&(cluster<((fnum-1)*clustersPerFile)));
+                ++cluster) {
+            ++clustersThisFile;
+            if (clustermap[cluster]!=0) {
+                ++clustercount;
+            }
+        }
+        if (clustercount>0) {
+            printf("      Data%04u: %'*.1f%% full (%'.1f%% of total)\n",
+                fnum,
+                width+2,
+                ((double)clustercount*100.0/clustersThisFile),
+                ((double)clustercount*100.0/usedClusters));
+        }
+    }
 }
 void XBoxFATX::zeroClusters()
 {
@@ -392,13 +414,16 @@ int main(int argc __attribute__ ((unused)),char* argv[])
         return EXIT_SUCCESS;
     }
     //
-    // options which are exclusive, each does something and exits
+    // quick check for verbose option
     for (int i=2; i<argc; ++i) {
         // --verbose | -v
         if ((strncmp(argv[i],"-v",3)==0)||(strncmp(argv[i],"--verbose",10)==0)) {
             xbox.verbose=true;
-            continue;
+            break;
         }
+    }
+    // options which are exclusive, each does something and exits
+    for (int i=2; i<argc; ++i) {
         // --zero | (no short version)
         if ((strncmp(argv[i],"--zero",7)==0)) {
             xbox.zeroClusters();

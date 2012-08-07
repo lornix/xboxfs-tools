@@ -29,7 +29,7 @@ const std::string  DEFAULTBASENAME      = "Data";
 const std::string  DEFAULTDEVICENAME    = "Memory Unit";
 const unsigned int FIRSTDATAFILE        = (2);
 const unsigned long int DEFAULTFILESIZE = (ONEGIG);
-#define BYTESPERSECTOR    (512)         // it could change, right?
+const unsigned int BYTESPERSECTOR       = (512); // it could change, right?
 //
 // FATX magic constants
 const unsigned int FATXMAGIC_LE=(0x46415458u); // "FATX"

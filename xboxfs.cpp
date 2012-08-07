@@ -1,10 +1,10 @@
 #include "xboxfs.h"
 
 
-void XBoxFATX::showtree(std::string startpath,bool showfiles)
+int XBoxFATX::showtree(std::string startpath,bool showfiles)
 {
     // preset to first entry of dirtree
-    std::vector<direntry_t>::iterator entry=dirtree.begin();
+    std::vector<direntry_t>::const_iterator entry=dirtree.begin();
     // if startpath non-NULL, find starting path
     if (startpath.length()>0) {
         std::regex findregex(startpath,std::regex::ECMAScript);
@@ -21,11 +21,11 @@ void XBoxFATX::showtree(std::string startpath,bool showfiles)
     }
     if (entry==dirtree.end()) {
         fprintf(stderr,"Path '%s' not found\n",startpath.c_str());
-        exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
     fprintf(stderr,"showfiles=%d\n",showfiles);
     fprintf(stderr,"First entry: %s\n",entry->name.c_str());
-
+    return EXIT_SUCCESS;
 }
 XBoxFATX::XBoxFATX(char* path)
 {
@@ -55,7 +55,7 @@ XBoxFATX::XBoxFATX(char* path)
             // how big is this device?
             bytesPerDevice=getlongBE(fnum,0x240);
             // determine how many Data???? files total (Data0002->DataXXXX)
-            lastfile=(bytesPerDevice/DEFAULTFILESIZE)+FIRSTDATAFILE;
+            lastfile=(unsigned int)(bytesPerDevice/DEFAULTFILESIZE)+FIRSTDATAFILE;
         }
         else if (fnum==1) {
             // Data0001
@@ -72,8 +72,8 @@ XBoxFATX::XBoxFATX(char* path)
             rootDirCluster=getintBE(fnum,0x0c);
             // makes it easier to determine file offsets
             bytesPerCluster=(sectorsPerCluster*BYTESPERSECTOR);
-            totalClusters=(bytesPerDevice/bytesPerCluster);
-            clustersPerFile=(DEFAULTFILESIZE/bytesPerCluster);
+            totalClusters=(unsigned int)(bytesPerDevice/bytesPerCluster);
+            clustersPerFile=(unsigned int)(DEFAULTFILESIZE/bytesPerCluster);
             // read in the cluster map
             usedClusters=0;
             for (unsigned int num=0; num<(totalClusters+1); ++num) {
@@ -144,7 +144,7 @@ void XBoxFATX::readClusters(unsigned int startCluster,unsigned char** buffer,fil
     *buffer=clusterbuf;
     *bufferlen=buflen;
 }
-void XBoxFATX::convertUTF16(char* outstr,wchar_t* instr,unsigned int length)
+void XBoxFATX::convertUTF16(char* outstr,wchar_t* instr,filepos_t length)
 {
     char* ptr=outstr;
     unsigned int widestartchar=0;
@@ -233,9 +233,9 @@ void XBoxFATX::readDirectoryTree(unsigned int startCluster)
     }
     free(dirbuf);
 }
-direntry_t* XBoxFATX::findFileEntry(std::string filename)
+const direntry_t* XBoxFATX::findFileEntry(std::string filename)
 {
-    std::vector<direntry_t>::iterator ptr=dirtree.begin();
+    std::vector<direntry_t>::const_iterator ptr=dirtree.begin();
     while ((ptr!=dirtree.end())&&(ptr->name!=filename)) {
         ++ptr;
     }
@@ -247,7 +247,7 @@ direntry_t* XBoxFATX::findFileEntry(std::string filename)
 }
 filepos_t XBoxFATX::getfilesize(std::string filename)
 {
-    direntry_t* entry=findFileEntry(filename);
+    const direntry_t* entry=findFileEntry(filename);
     if (!entry) {
         return 0;
     }
@@ -255,7 +255,7 @@ filepos_t XBoxFATX::getfilesize(std::string filename)
 }
 unsigned char* XBoxFATX::readfilecontents(std::string filename)
 {
-    direntry* entry=findFileEntry(filename);
+    const direntry* entry=findFileEntry(filename);
     if (!entry) {
         return NULL;
     }
@@ -302,10 +302,10 @@ void XBoxFATX::zeroClusters()
     double prevpercent=0.0;
     // find all unallocated clusters, write zeros to each cluster
     // performed in REVERSE order so most likely used files end up in the cache
-    for (unsigned int i=clustermap.size()-1; i>0; --i) {
+    for (unsigned int i=(unsigned int)clustermap.size()-1; i>0; --i) {
         if (clustermap[i]==0) {
             if (verbose) {
-                double percent=100.0-(floor((double)i*1000.0/clustermap.size())/10.0);
+                double percent=100.0-(floor((double)i*1000.0/(double)clustermap.size())/10.0);
                 if (percent>prevpercent) {
                     printf("\rClearing Free Space: (%u) %4.1f%% ",(FIRSTDATAFILE+(i/clustersPerFile)),percent);
                     fflush(stdout);
@@ -388,8 +388,7 @@ int main(int argc __attribute__ ((unused)),char* argv[])
             if (argc>(i+1)) {
                 treepath=std::string(argv[i+1]);
             }
-            xbox.showtree(treepath,WITHFILES);
-            return EXIT_SUCCESS;
+            return xbox.showtree(treepath,WITHFILES);
         }
         // --dir [PATH] | -d [PATH]
         if ((strncmp(argv[i],"-d",3)==0)||(strncmp(argv[i],"--dir",6)==0)) {
@@ -399,8 +398,7 @@ int main(int argc __attribute__ ((unused)),char* argv[])
             if (argc>(i+1)) {
                 treepath=std::string(argv[i+1]);
             }
-            xbox.showtree(treepath,WITHOUTFILES);
-            return EXIT_SUCCESS;
+            return xbox.showtree(treepath,WITHOUTFILES);
         }
         // --extract FNAME | -x FNAME
         if ((strncmp(argv[i],"-x",3)==0)||(strncmp(argv[i],"--extract",10)==0)) {

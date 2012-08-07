@@ -11,22 +11,22 @@ void XBoxFATX::setDefaults()
     // default device name
     deviceName=DEFAULTDEVICENAME;
     deviceNameSet=false;
-    // internal values
+    // set to 'no current file'
     fp=NULL;
-    currentfnum=-1;
+    currentfnum=999; // waaaay out of possible values
     //
     verbose=false;
     //
     // set locale so we get thousands grouping
     setlocale(LC_ALL,"");
 }
-void XBoxFATX::selectfile(int fnum,filepos_t pos)
+void XBoxFATX::selectfile(unsigned int fnum,filepos_t pos)
 {
     if ((fnum>=FIRSTDATAFILE)&&(pos>=ONEGIG)) {
         // xbox puts 1Gig per file
         // if position > 1GIG, fix fnum
         // integer division, no fractional part
-        fnum=(pos/ONEGIG)+FIRSTDATAFILE;
+        fnum=(unsigned int)(pos/ONEGIG)+FIRSTDATAFILE;
         // Make the position represent WITHIN the respective file
         pos=pos%ONEGIG;
     }
@@ -51,7 +51,7 @@ void XBoxFATX::selectfile(int fnum,filepos_t pos)
         exit(1);
     }
 }
-void XBoxFATX::readdata(int fnum,filepos_t pos,filepos_t len,void* buf)
+void XBoxFATX::readdata(unsigned int fnum,filepos_t pos,filepos_t len,void* buf)
 {
     selectfile(fnum,pos);
     if (fread(buf,len,1,fp)!=1) {
@@ -61,7 +61,7 @@ void XBoxFATX::readdata(int fnum,filepos_t pos,filepos_t len,void* buf)
         // memset(buf,0,len);
     }
 }
-void XBoxFATX::writedata(int fnum,filepos_t pos,filepos_t len,void* buf)
+void XBoxFATX::writedata(unsigned int fnum,filepos_t pos,filepos_t len,void* buf)
 {
     selectfile(fnum,pos);
     if (fwrite(buf,len,1,fp)!=1) {
@@ -75,10 +75,11 @@ void XBoxFATX::closeAllFiles()
     if (fp) {
         fclose(fp);
     }
+    // indicate 'no current open file'
     fp=NULL;
-    currentfnum=-1;
+    currentfnum=999; // again, out of valid range
 }
-unsigned long int XBoxFATX::getlongBE(int fnum,filepos_t pos)
+unsigned long int XBoxFATX::getlongBE(unsigned int fnum,filepos_t pos)
 {
     // dummy value, shouldn't show up
     unsigned long int valueBE=0xee0fdcbaefbeadde; // 0xDEADBEEFBADC0FEE in BE order
@@ -87,7 +88,7 @@ unsigned long int XBoxFATX::getlongBE(int fnum,filepos_t pos)
     readdata(fnum,pos,sizeof(valueBE),&valueBE);
     return be64toh(valueBE);
 }
-unsigned int XBoxFATX::getintBE(int fnum,filepos_t pos)
+unsigned int XBoxFATX::getintBE(unsigned int fnum,filepos_t pos)
 {
     // dummy value, shouldn't show up
     unsigned int valueBE=0xefbeadde; // 0xDEADBEEF

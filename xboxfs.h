@@ -14,26 +14,30 @@
 // my info
 #define AUTHORNAME  "L. R. Nix"         // it's me, Mario!
 #define AUTHOREMAIL "lornix@lornix.com"
-// clustermap code values
-#define CLUSTEREND (0xFFFFFFFFu)        // value for 'end-of-chain' in clustermap
-#define ROOTDIRID  (0xFFFFFFF8u)        // Not used, yet
-// useful constants, easier to visualize what's going on
-#define ONEKAY           (1024lu)       // ok, so how would YOU spell it?
-#define ONEMEG      (1024*1024lu)
-#define ONEGIG (1024*1024*1024lu)
 //
-#define VOLNAMEFILE       "name.txt"
-#define FIRSTDATAFILE     (2)
-#define DEFAULTBASENAME   "Data"
-#define DEFAULTFILESIZE   (ONEGIG)
-#define DEFAULTDEVICENAME "Memory Unit"
+// clustermap code values
+const unsigned int CLUSTEREND=(0xFFFFFFFFu); // value for 'end-of-chain' in clustermap
+const unsigned int ROOTDIRID =(0xFFFFFFF8u); // Not used, yet
+//
+// useful constants, easier to visualize what's going on
+const unsigned long int ONEKAY=(1024lu); // ok, so how would YOU spell it?
+const unsigned long int ONEMEG=(1024*1024lu);
+const unsigned long int ONEGIG=(1024*1024*1024lu);
+//
+const std::string  VOLNAMEFILE          = "name.txt";
+const std::string  DEFAULTBASENAME      = "Data";
+const std::string  DEFAULTDEVICENAME    = "Memory Unit";
+const unsigned int FIRSTDATAFILE        = (2);
+const unsigned long int DEFAULTFILESIZE = (ONEGIG);
 #define BYTESPERSECTOR    (512)         // it could change, right?
-#define FATXMAGIC_LE      (0x46415458u) // "FATX"
-#define FATXMAGIC_BE      (0x58544146u) // "XTAF"
+//
+// FATX magic constants
+const unsigned int FATXMAGIC_LE=(0x46415458u); // "FATX"
+const unsigned int FATXMAGIC_BE=(0x58544146u); // "XTAF"
 
 // helpful defines to describe flags
-#define WITHFILES    (true)
-#define WITHOUTFILES (false)
+const bool WITHFILES    = true;
+const bool WITHOUTFILES = false;
 
 // utility functions
 void version();
@@ -64,12 +68,12 @@ class XBoxFATX {
      bool verbose;              // verbose output?
  public: // methods
      void showinfo();
-     direntry_t* findFileEntry(std::string filename);
+     const direntry_t* findFileEntry(std::string filename);
      void readDirectoryTree(unsigned int startCluster);
      void readClusters(unsigned int startCluster,unsigned char** dirbuf,filepos_t* buflen);
-     void convertUTF16(char* outstr,wchar_t* instr,unsigned int len);
+     void convertUTF16(char* outstr,wchar_t* instr,filepos_t len);
      void zeroClusters();
-     void showtree(std::string startpath,bool showfiles);
+     int showtree(std::string startpath,bool showfiles);
      unsigned char* readfilecontents(std::string filename);
      filepos_t getfilesize(std::string filename);
  public: // -structors
@@ -86,7 +90,7 @@ class XBoxFATX {
      unsigned int countFiles;               // count of files on device
      unsigned int countDirs;                // count of dirs on device
      unsigned int lastfile;                 // number of last data file
-     int currentfnum;                       // which file currently open
+     unsigned int currentfnum;              // which file currently open
      FILE* fp;                              // FILE* for current file
      filepos_t bytesPerDevice;              // huge! (256M/512M...8G/16G)
      std::string deviceName;                // read from name.txt (if found)
@@ -95,12 +99,12 @@ class XBoxFATX {
      std::vector<unsigned int>clustermap;   // built from device
      std::vector<direntry_t>dirtree;        // built from device
  private: // methods
-     unsigned long  int getlongBE( int fnum,filepos_t pos);
-     unsigned       int getintBE(  int fnum,filepos_t pos);
-     void  readdata(int fnum,filepos_t pos,filepos_t len,void* buf);
-     void writedata(int fnum,filepos_t pos,filepos_t len,void* buf);
+     unsigned long  int getlongBE( unsigned int fnum,filepos_t pos);
+     unsigned       int getintBE(  unsigned int fnum,filepos_t pos);
+     void  readdata(unsigned int fnum,filepos_t pos,filepos_t len,void* buf);
+     void writedata(unsigned int fnum,filepos_t pos,filepos_t len,void* buf);
      void setDefaults();
      void closeAllFiles();
-     void selectfile(int fnum,filepos_t pos);
+     void selectfile(unsigned int fnum,filepos_t pos);
      std::string datafilename(int which);
 };

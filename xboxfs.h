@@ -1,6 +1,7 @@
 #include <iostream>
 #include <sstream>
 #include <vector>
+#include <regex>
 #include <cstdio>
 #include <cstdlib>
 #include <cassert>
@@ -30,6 +31,10 @@
 #define FATXMAGIC_LE      (0x46415458u) // "FATX"
 #define FATXMAGIC_BE      (0x58544146u) // "XTAF"
 
+// helpful defines to describe flags
+#define WITHFILES    (true)
+#define WITHOUTFILES (false)
+
 // utility functions
 void version();
 void usage();
@@ -39,6 +44,7 @@ typedef unsigned long int filepos_t;
 struct direntry {
     int nestlevel;
     int attributes;
+    bool isdir;
     std::string name;
     unsigned int startCluster;
     unsigned int parentCluster;
@@ -63,6 +69,7 @@ class XBoxFATX {
      void readClusters(unsigned int startCluster,unsigned char** dirbuf,filepos_t* buflen);
      void convertUTF16(char* outstr,wchar_t* instr,unsigned int len);
      void zeroClusters();
+     void showtree(std::string startpath,bool showfiles);
      unsigned char* readfilecontents(std::string filename);
      filepos_t getfilesize(std::string filename);
  public: // -structors
@@ -86,7 +93,7 @@ class XBoxFATX {
      bool deviceNameSet;                    // did we find name.txt to use?
      std::string dirpath;                   // where to find data files
      std::vector<unsigned int>clustermap;   // built from device
-     std::vector<struct direntry>dirtree;   // built from device
+     std::vector<direntry_t>dirtree;        // built from device
  private: // methods
      unsigned long  int getlongBE( int fnum,filepos_t pos);
      unsigned       int getintBE(  int fnum,filepos_t pos);

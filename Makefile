@@ -11,6 +11,8 @@ CXXFLAGS+=-Wall -Wextra -Wunused -Wundef
 #CXXFLAGS+=-O3
 # or not!
 CXXFLAGS+=-O0
+# enable C11 options (for regex)
+ CXXFLAGS+=-std=c++11
 #
 # das linker flags
 # LDFLAGS+=

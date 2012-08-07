@@ -1,5 +1,32 @@
 #include "xboxfs.h"
 
+
+void XBoxFATX::showtree(std::string startpath,bool showfiles)
+{
+    // preset to first entry of dirtree
+    std::vector<direntry_t>::iterator entry=dirtree.begin();
+    // if startpath non-NULL, find starting path
+    if (startpath.length()>0) {
+        std::regex findregex(startpath,std::regex::ECMAScript);
+        while (entry!=dirtree.end()) {
+            if (entry->isdir) {
+                bool regexresult=std::regex_match(entry->name,findregex);
+                fprintf(stderr,"searching: '%s' =%d= '%s/'\n",startpath.c_str(),regexresult,entry->name.c_str());
+                if (regexresult) {
+                    break;
+                }
+            }
+            entry++;
+        }
+    }
+    if (entry==dirtree.end()) {
+        fprintf(stderr,"Path '%s' not found\n",startpath.c_str());
+        exit(EXIT_FAILURE);
+    }
+    fprintf(stderr,"showfiles=%d\n",showfiles);
+    fprintf(stderr,"First entry: %s\n",entry->name.c_str());
+
+}
 XBoxFATX::XBoxFATX(char* path)
 {
     // no path given?  Show help and exit
@@ -165,6 +192,8 @@ void XBoxFATX::readDirectoryTree(unsigned int startCluster)
                 char namebuf[0x2a+1];
                 direntry_t entry;
                 entry.attributes=*(ptr+1);
+                // makes determining if directory easier
+                entry.isdir=(*(ptr+1)&0x10);
                 strncpy(namebuf,(char*)(ptr+0x02),0x2a);
                 namebuf[*ptr]=0;
                 entry.name=std::string(namebuf);
@@ -179,7 +208,7 @@ void XBoxFATX::readDirectoryTree(unsigned int startCluster)
                 entry.accessDate   =be16toh(*((unsigned short int*)(ptr+0x3c)));
                 entry.accessTime   =be16toh(*((unsigned short int*)(ptr+0x3e)));
                 //
-                if (entry.attributes&0x10) {
+                if (entry.isdir) {
                     // count number of directories found
                     countDirs++;
                 }
@@ -190,7 +219,7 @@ void XBoxFATX::readDirectoryTree(unsigned int startCluster)
                 // store it
                 dirtree.push_back(entry);
                 //
-                if (entry.attributes&0x10) {
+                if (entry.isdir) {
                     // the recursive part! call ourself when we find a subdir
                     nestlevel++;
                     readDirectoryTree(entry.startCluster);
@@ -344,6 +373,10 @@ int main(int argc __attribute__ ((unused)),char* argv[])
         if ((strncmp(argv[i],"-l",3)==0)||(strncmp(argv[i],"--list",7)==0)) {
             // ANY following argument is ALWAYS taken as the optional
             // path if present, must obviously be last on line
+            std::string treepath="";
+            if (argc>(i+1)) {
+                treepath=std::string(argv[i+1]);
+            }
             fprintf(stderr,"--list stub\n");
             return EXIT_SUCCESS;
         }
@@ -351,14 +384,22 @@ int main(int argc __attribute__ ((unused)),char* argv[])
         if ((strncmp(argv[i],"-t",3)==0)||(strncmp(argv[i],"--tree",7)==0)) {
             // ANY following argument is ALWAYS taken as the optional
             // path if present, must obviously be last on line
-            fprintf(stderr,"--tree stub\n");
+            std::string treepath="";
+            if (argc>(i+1)) {
+                treepath=std::string(argv[i+1]);
+            }
+            xbox.showtree(treepath,WITHFILES);
             return EXIT_SUCCESS;
         }
         // --dir [PATH] | -d [PATH]
         if ((strncmp(argv[i],"-d",3)==0)||(strncmp(argv[i],"--dir",6)==0)) {
             // ANY following argument is ALWAYS taken as the optional
             // path if present, must obviously be last on line
-            fprintf(stderr,"--dir stub\n");
+            std::string treepath="";
+            if (argc>(i+1)) {
+                treepath=std::string(argv[i+1]);
+            }
+            xbox.showtree(treepath,WITHOUTFILES);
             return EXIT_SUCCESS;
         }
         // --extract FNAME | -x FNAME

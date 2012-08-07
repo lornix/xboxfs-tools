@@ -16,7 +16,7 @@ void XBoxFATX::showtree(std::string startpath,bool showfiles)
                     break;
                 }
             }
-            entry++;
+            ++entry;
         }
     }
     if (entry==dirtree.end()) {
@@ -76,19 +76,19 @@ XBoxFATX::XBoxFATX(char* path)
             clustersPerFile=(DEFAULTFILESIZE/bytesPerCluster);
             // read in the cluster map
             usedClusters=0;
-            for (unsigned int num=0; num<(totalClusters+1); num++) {
+            for (unsigned int num=0; num<(totalClusters+1); ++num) {
                 filepos_t offset=(num*sizeof(unsigned int))+0x1000;
                 int clusterUse=getintBE(fnum,offset);
                 clustermap.push_back(clusterUse);
                 if (clustermap[num]!=0) {
-                    usedClusters++;
+                    ++usedClusters;
                 }
             }
             // decrement for the '0'th entry and root dir's first (only?) cluster
             usedClusters-=2;
         }
         // increment to check next file
-        fnum++;
+        ++fnum;
     }
     // total file/dir counts
     countFiles=0;
@@ -126,7 +126,7 @@ void XBoxFATX::readClusters(unsigned int startCluster,unsigned char** buffer,fil
     //
     while (currentCluster!=CLUSTEREND) {
         filepos_t clusterPos=((filepos_t)(currentCluster-1)*(filepos_t)bytesPerCluster);
-        numclusters++;
+        ++numclusters;
         // extend buffer to make it right size
         buflen=((filepos_t)bytesPerCluster*(filepos_t)numclusters);
         clusterbuf=(unsigned char*)realloc(clusterbuf,buflen);
@@ -156,7 +156,7 @@ void XBoxFATX::convertUTF16(char* outstr,wchar_t* instr,unsigned int length)
     // determine BE or LE from first two bytes (BOM)
     bool BE1orLE0=((*(unsigned short int*)instr)==0xFFFE);
     //
-    for (unsigned int i=widestartchar; i<(length>>1); i++) {
+    for (unsigned int i=widestartchar; i<(length>>1); ++i) {
         unsigned short int* wcptr=(unsigned short int*)instr+i;
         // get wide char, flip if needed
         wchar_t wc=(BE1orLE0)?be16toh(*wcptr):le16toh(*wcptr);
@@ -210,20 +210,20 @@ void XBoxFATX::readDirectoryTree(unsigned int startCluster)
                 //
                 if (entry.isdir) {
                     // count number of directories found
-                    countDirs++;
+                    ++countDirs;
                 }
                 else {
                     // count number of files found
-                    countFiles++;
+                    ++countFiles;
                 }
                 // store it
                 dirtree.push_back(entry);
                 //
                 if (entry.isdir) {
                     // the recursive part! call ourself when we find a subdir
-                    nestlevel++;
+                    ++nestlevel;
                     readDirectoryTree(entry.startCluster);
-                    nestlevel--;
+                    --nestlevel;
                 }
                 break;
                 // end of switch default block
@@ -237,7 +237,7 @@ direntry_t* XBoxFATX::findFileEntry(std::string filename)
 {
     std::vector<direntry_t>::iterator ptr=dirtree.begin();
     while ((ptr!=dirtree.end())&&(ptr->name!=filename)) {
-        ptr++;
+        ++ptr;
     }
     if (ptr==dirtree.end()) {
         // all entries checked, not found
@@ -302,7 +302,7 @@ void XBoxFATX::zeroClusters()
     double prevpercent=0.0;
     // find all unallocated clusters, write zeros to each cluster
     // performed in REVERSE order so most likely used files end up in the cache
-    for (unsigned int i=clustermap.size()-1; i>0; i--) {
+    for (unsigned int i=clustermap.size()-1; i>0; --i) {
         if (clustermap[i]==0) {
             if (verbose) {
                 double percent=100.0-(floor((double)i*1000.0/clustermap.size())/10.0);
@@ -328,7 +328,7 @@ int main(int argc __attribute__ ((unused)),char* argv[])
     // and most of the options are exclusive and can't be mixed anyways.
     //
     //  first pass, handle the easy one-shots
-    for (int i=1; i<argc; i++) {
+    for (int i=1; i<argc; ++i) {
         // --version | -V
         if ((strncmp(argv[i],"-V",3)==0)||(strncmp(argv[i],"--version",10)==0)) {
             version();
@@ -353,7 +353,7 @@ int main(int argc __attribute__ ((unused)),char* argv[])
     }
     //
     // options which are exclusive, each does something and exits
-    for (int i=2; i<argc; i++) {
+    for (int i=2; i<argc; ++i) {
         // --verbose | -v
         if ((strncmp(argv[i],"-v",3)==0)||(strncmp(argv[i],"--verbose",10)==0)) {
             xbox.verbose=true;
